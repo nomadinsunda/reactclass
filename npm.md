@@ -1,0 +1,217 @@
+**npm (Node Package Manager)**은 단순한 "패키지 설치 도구"를 넘어서, **Node.js 생태계를 구성하는 핵심 인프라**입니다.
+
+---
+
+# ✅ 1. npm이란?
+
+> **npm**은 Node.js의 공식 패키지 관리자이며,
+> **패키지 설치, 관리, 버전 관리, 의존성 해결, 배포, 팀 협업**까지 포괄하는 도구입니다.
+
+* Node.js 설치 시 함께 설치됨
+* 전 세계 최대의 오픈소스 모듈 저장소 운영
+* **npm CLI** + **npm Registry** + **package.json** 시스템으로 구성
+
+---
+
+# ✅ 2. 구성 요소
+
+| 구성 요소               | 설명                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| 📦 **npm CLI**      | `npm install`, `npm init` 등 명령어                                                        |
+| 🌐 **npm Registry** | 전 세계 JS 모듈이 올라가는 중앙 저장소 <br>([https://registry.npmjs.org](https://registry.npmjs.org)) |
+| 📁 **package.json** | 프로젝트의 의존성, 메타데이터, 스크립트를 정의하는 파일                                                        |
+
+---
+
+# ✅ 3. 핵심 기능
+
+## 3.1 📥 패키지 설치
+
+```bash
+npm install express
+```
+
+* `node_modules/`에 설치
+* `package.json`에 기록됨 (`--save`는 기본값)
+
+## 3.2 📤 패키지 배포
+
+```bash
+npm publish
+```
+
+* `npm login` → `npm publish`로 자신만의 패키지를 배포 가능
+* `package.json`의 name, version 필수
+
+## 3.3 📚 의존성 관리
+
+* **dependencies**: 런타임 의존성
+* **devDependencies**: 개발 시에만 필요한 도구 (예: eslint, webpack)
+* **peerDependencies**: 호환되는 외부 라이브러리 요구 (ex: react plugin이 react 필요)
+
+## 3.4 📦 글로벌 vs 로컬 설치
+
+```bash
+npm install -g typescript  # 전역 설치
+npm install typescript     # 로컬 설치 (node_modules 내)
+```
+
+---
+
+# ✅ 4. `package.json` 상세 구조
+
+```json
+{
+  "name": "my-app",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+```
+
+## 주요 필드 설명
+
+| 필드               | 설명                                   |
+| ---------------- | ------------------------------------ |
+| name, version    | 패키지 식별자 및 버전 (semver 기반)             |
+| scripts          | CLI 명령어 단축 (`npm run <script-name>`) |
+| dependencies     | 런타임 의존성                              |
+| devDependencies  | 개발 중에만 필요한 의존성                       |
+| engines          | 해당 Node.js 버전 명시 가능                  |
+| peerDependencies | 다른 패키지와의 호환성 요구                      |
+
+---
+
+# ✅ 5. 버전 관리 (SemVer)
+
+npm은 **SemVer (Semantic Versioning)** 을 따릅니다: `MAJOR.MINOR.PATCH`
+
+| 예                | 의미                        |
+| ---------------- | ------------------------- |
+| `1.2.3`          | 기본 버전                     |
+| `^1.2.3`         | 1.x.x 버전 허용 (최대 2.0.0 미만) |
+| `~1.2.3`         | 1.2.x 버전 허용 (최대 1.3.0 미만) |
+| `>=1.2.0 <2.0.0` | 범위 지정                     |
+
+---
+
+# ✅ 6. 캐시 & 성능 향상
+
+## 📦 캐시 경로
+
+* 기본 위치: `~/.npm`
+* 설치된 패키지를 캐싱 → 재설치 시 속도 향상
+
+## 🧹 캐시 정리
+
+```bash
+npm cache clean --force
+```
+
+---
+
+# ✅ 7. 자주 사용하는 명령어 요약
+
+| 명령어                   | 설명                         |
+| --------------------- | -------------------------- |
+| `npm init`            | 프로젝트 초기화 (package.json 생성) |
+| `npm install`         | 모든 의존성 설치                  |
+| `npm install <pkg>`   | 특정 패키지 설치                  |
+| `npm uninstall <pkg>` | 패키지 삭제                     |
+| `npm update`          | 패키지 최신 버전으로 업데이트           |
+| `npm run <script>`    | 정의된 스크립트 실행                |
+| `npm ls`              | 설치된 의존성 트리 확인              |
+| `npm audit`           | 보안 취약점 검사                  |
+| `npm link`            | 로컬 패키지 연결 (로컬 개발용)         |
+| `npm publish`         | 패키지를 Registry에 배포          |
+
+---
+
+# ✅ 8. 고급 기능
+
+## 8.1 `npm workspaces` (모노레포 지원)
+
+```json
+{
+  "workspaces": ["packages/*"]
+}
+```
+
+* 여러 패키지를 하나의 루트에서 관리 (Lerna, Turborepo 대체)
+
+## 8.2 `.npmrc` 설정
+
+* 전역 또는 프로젝트 단위로 npm 동작 커스터마이징
+
+```ini
+registry=https://registry.npmjs.org/
+save-exact=true
+```
+
+## 8.3 `npx`
+
+* npm 5.2+ 포함된 실행기
+* 설치 없이 CLI 실행 가능
+
+```bash
+npx create-react-app my-app
+```
+
+---
+
+# ✅ 9. 보안 & 감사
+
+## `npm audit`
+
+```bash
+npm audit
+npm audit fix
+```
+
+* 설치된 패키지의 보안 취약점 검사 및 자동 수정
+
+## 취약점 관리 사례
+
+* npm은 CVE 데이터베이스를 기반으로 보안 경고를 제공
+* `package-lock.json` 기반으로 정확한 패치 제안
+
+---
+
+# ✅ 10. 요약
+
+| 항목 | 설명                                |
+| -- | --------------------------------- |
+| 역할 | Node.js 패키지 설치, 버전 관리, 배포         |
+| 구성 | npm CLI + Registry + package.json |
+| 특징 | SemVer 기반, 캐시 지원, audit 기능 내장     |
+| 고급 | Workspaces, npx, .npmrc, 스크립트 관리  |
+
+---
+
+# 📌 결론
+
+npm은 단순한 "설치 도구"를 넘어서,
+**현대 자바스크립트 생태계를 운영하는 핵심 인프라이자, 자동화 플랫폼**입니다.
+
+---
+
+# 📌 참고 사항
+
+* npm과 Yarn, pnpm의 비교 및 성능 벤치마크
+* `node_modules` 내부 동작 원리와 플랫 구조
+* `package-lock.json` vs `shrinkwrap` 정확한 차이
+* 사설 npm 레지스트리 구축 (예: Verdaccio)
+
+
