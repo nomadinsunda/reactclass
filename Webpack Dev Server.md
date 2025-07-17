@@ -91,3 +91,54 @@ server {
   }
 }
 ```
+
+
+
+## ✅ `npm start`의 정체
+
+```bash
+npm start
+```
+
+➡️ 이는 내부적으로 다음을 실행합니다:
+
+```bash
+react-scripts start
+```
+
+➡️ 그리고 `react-scripts start`는 **Webpack Dev Server**를 실행합니다.
+
+---
+
+## ✅ Webpack Dev Server의 역할
+
+| 역할             | 설명                                            |
+| -------------- | --------------------------------------------- |
+| 🛰️ HTTP 서버 역할 | React 앱을 브라우저에 서빙 (기본 포트: `localhost:3000`)   |
+| 🔁 핫 리로딩(HMR)  | 파일을 저장하면 브라우저가 자동 새로고침됨                       |
+| 🧠 메모리 기반 번들   | 실제 디스크에 쓰지 않고 메모리에서 번들 실행                     |
+| 🔄 프록시 처리      | `package.json`의 `"proxy"`를 통해 백엔드 요청을 포워딩     |
+| 📦 번들링 자동 수행   | Webpack + Babel로 JSX, ES6 등을 브라우저가 이해할 코드로 변환 |
+
+---
+
+## ✅ 흐름 정리
+
+```
+npm start
+↓
+react-scripts start
+↓
+Webpack Dev Server 실행
+↓
+브라우저 열림 (http://localhost:3000)
+↓
+React SPA가 메모리 번들로 실시간 제공됨
+```
+
+---
+
+## ✅ 결과
+
+> React 기반 SPA가 **Webpack Dev Server에 의해 자동으로 실행되고**,
+> 브라우저가 해당 앱을 **localhost:3000**에서 로딩하게 되는 것입니다.
