@@ -1,4 +1,4 @@
-Node.js는 **Chrome의 V8 JavaScript 엔진** 위에서 동작하는 \*\*서버 사이드 JavaScript 런타임 환경(runtime environment)\*\*입니다. 원래 자바스크립트는 웹 브라우저에서만 실행되었지만, Node.js는 자바스크립트를 **브라우저 외부**, 즉 **서버나 로컬 컴퓨터**에서 실행할 수 있게 해줍니다.
+Node.js는 **Chrome의 V8 JavaScript 엔진** 위에서 동작하는 **서버 사이드 JavaScript 런타임 환경\(\runtime environment\)\**입니다. 원래 자바스크립트는 웹 브라우저에서만 실행되었지만, Node.js는 자바스크립트를 **브라우저 외부**, 즉 **서버나 로컬 컴퓨터**에서 실행할 수 있게 해줍니다.
 
 ---
 
