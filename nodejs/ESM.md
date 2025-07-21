@@ -1,0 +1,161 @@
+# ✅ ES Module (ESM)이란?
+
+> **ECMAScript Modules**의 약자.
+> ES6(2015)에서 **자바스크립트 공식 표준으로 도입된 모듈 시스템**입니다.
+
+---
+
+## 📦 1. 왜 ES Module이 등장했나?
+
+Node.js는 오랫동안 CommonJS(`require`, `module.exports`)를 사용했지만, 브라우저는 이를 지원하지 않았습니다.
+
+💡 그래서 **브라우저와 Node.js에서 공통으로 사용할 수 있는 표준 모듈 시스템**이 필요했고, 그 결과 나온 것이 **ES Module**입니다.
+
+| CommonJS (기존 방식)   | ES Module (표준)         |
+| ------------------ | ---------------------- |
+| Node.js 전용         | 브라우저 & Node.js 모두 지원   |
+| 동기적 로딩 (`require`) | 비동기적 로딩 (`import`)     |
+| 런타임에 로딩            | 정적 분석 가능 (트리 쉐이킹 등 유리) |
+
+---
+
+## ✅ 2. ES Module의 기본 문법
+
+### 📁 math.js (모듈 정의)
+
+```js
+export function add(a, b) {
+  return a + b;
+}
+
+export const PI = 3.1415;
+```
+
+### 📁 app.js (모듈 사용)
+
+```js
+import { add, PI } from './math.js';
+
+console.log(add(2, 3));  // 5
+console.log(PI);         // 3.1415
+```
+
+📌 `export`는 모듈에서 내보낼 대상 지정
+📌 `import`는 외부 모듈에서 지정한 항목을 불러옴
+📌 `.js` 확장자는 **반드시 필요**
+
+---
+
+## ✅ 3. Node.js에서 ES Module을 사용하려면?
+
+### 방법 1️⃣: `package.json`에 `"type": "module"` 추가
+
+```json
+{
+  "type": "module"
+}
+```
+
+* `.js` 파일이 **ESM 문법**으로 동작
+
+### 방법 2️⃣: 확장자를 `.mjs`로 사용
+
+```bash
+node app.mjs
+```
+
+* `type` 설정 없이도 `.mjs`는 ESM으로 인식됨
+
+---
+
+## ✅ 4. 다양한 ESM 문법
+
+### ▶️ 기본(default) export
+
+```js
+// logger.js
+export default function log(msg) {
+  console.log("LOG:", msg);
+}
+```
+
+```js
+// app.js
+import log from './logger.js';
+log('Hello ESM');
+```
+
+### ▶️ 별칭(alias) 지정
+
+```js
+import { add as plus } from './math.js';
+plus(1, 2); // 3
+```
+
+### ▶️ 전체 가져오기 (`* as`)
+
+```js
+import * as math from './math.js';
+console.log(math.add(3, 4));
+```
+
+---
+
+## ✅ 5. ESM vs CommonJS 차이
+
+| 항목              | CommonJS                      | ES Module                            |
+| --------------- | ----------------------------- | ------------------------------------ |
+| 사용 방식           | `require()`, `module.exports` | `import`, `export`                   |
+| 로딩 시점           | 런타임에 로딩                       | 정적 분석 단계에 로딩                         |
+| 파일 확장자          | `.js` (기본)                    | `.js` + `"type": "module"` or `.mjs` |
+| 트리쉐이킹           | ❌ 불가                          | ✅ 가능                                 |
+| top-level await | ❌ 안 됨                         | ✅ 가능                                 |
+
+---
+
+## ✅ 6. top-level await (ESM만 가능)
+
+```js
+// app.js
+const res = await fetch('https://jsonplaceholder.typicode.com/todos/1');
+const data = await res.json();
+console.log(data);
+```
+
+✅ ESM에서는 파일 최상위에서도 `await` 사용 가능
+
+---
+
+## ✅ 7. import.meta
+
+```js
+console.log(import.meta.url); // 현재 파일의 절대 경로 (file:///...)
+```
+
+* ESM에서만 제공되는 특수 객체
+* 현재 모듈의 메타 정보에 접근 가능
+
+---
+
+## ✅ 8. 프로젝트 구성 시 주의점
+
+| 항목        | 내용                                          |
+| --------- | ------------------------------------------- |
+| ESM 사용할 때 | `"type": "module"` 추가 필요                    |
+| 확장자       | `.js` → `import`할 때 꼭 `.js` 명시              |
+| 외부 모듈     | 대부분 ESM을 지원하지만 CommonJS 모듈과 섞어 쓸 때 이슈 발생 가능 |
+| 혼용 금지     | 하나의 파일에서 `require`와 `import`를 **혼용 금지**     |
+
+---
+
+## ✅ 마무리 요약
+
+| 개념          | 설명                                    |
+| ----------- | ------------------------------------- |
+| ES Module   | 자바스크립트의 표준 모듈 시스템                     |
+| 사용법         | `import`, `export`                    |
+| Node.js 사용법 | `"type": "module"` 추가 또는 `.mjs` 확장자   |
+| 주요 장점       | 브라우저와 호환, 정적 분석 가능, top-level await 등 |
+| 주의 사항       | `.js` 확장자 명시 필수, 혼용 금지, 동기/비동기 차이     |
+
+
