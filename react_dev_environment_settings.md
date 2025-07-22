@@ -90,9 +90,4 @@ npm create vite@latest my-app --template react
 | 🔄 Thunder Client or Postman    | 선택     | VS Code 확장 / postman.com                                         | API 테스트 툴         |
 | ✅ npx                           | npm 포함 | Node.js 설치 시 자동 포함                                               | React 프로젝트 생성에 필요 |
 
----
 
-필요하시면 다음 단계로 **설치 후 React 프로젝트 생성 및 실행** 방법,
-또는 **TypeScript 기반 React 개발 환경 구성**도 정리해드릴 수 있습니다.
-
-원하시는 방향 알려주세요.
