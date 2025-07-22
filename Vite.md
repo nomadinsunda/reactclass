@@ -1,0 +1,208 @@
+# 🚀 Vite 완전 정복: 차세대 프론트엔드 빌드 도구
+
+---
+
+## 🧠 1. 개요: Vite란 무엇인가?
+
+**Vite**는 Evan You(Vue의 창시자)가 만든 **차세대 프론트엔드 개발 도구**로, **빠른 개발 서버**와 **최적화된 번들링**을 목표로 설계된 **Modern Build Toolchain**입니다.
+
+> "Vite"는 불어로 "빠르다(Fast)"를 의미하며, Vite의 철학은 단순합니다:
+> 👉 *개발 서버는 빠르게, 프로덕션 빌드는 효율적으로.*
+
+---
+
+## 🧩 2. 전통적인 번들러(Webpack 등) 문제점
+
+| 항목         | 설명                                           |
+| ---------- | -------------------------------------------- |
+| Cold Start | 전체 소스코드를 **초기 번들링**해야 하므로 `npm run dev` 시 느림 |
+| HMR 비용     | 번들 단위로 핫 리로드 → 의존성 체인이 길수록 느림                |
+| 복잡한 설정     | Loader, Plugin 조합 설정이 어려움                    |
+| 느린 빌드      | 수천 개 모듈을 하나로 묶는 작업이 병목 발생                    |
+
+---
+
+## ⚙️ 3. Vite의 핵심 아키텍처
+
+### 📌 개발 시(Dev Server)
+
+* **ESBuild 기반**
+
+  * Go 언어로 작성된 빌드 툴 → 매우 빠른 속도
+  * TypeScript, JSX 등도 **실시간 변환**
+* **Native ESM (ES Modules)** 지원
+
+  * 번들링 없이 브라우저가 직접 `import` 실행
+  * 브라우저가 요청한 모듈만 서버가 제공 → 매우 빠른 HMR 가능
+
+> Vite는 `.ts`, `.jsx` 같은 확장자도 **on-demand 변환**하여 `import` 응답에만 반응합니다.
+
+### 📦 프로덕션 빌드 시
+
+* **Rollup 기반 번들링**
+
+  * Rollup은 모듈 스코프 기반 트리셰이킹(tree-shaking)과 코드 스플리팅이 강력함
+  * Vite는 **Rollup config**를 기반으로 `vite build` 실행 시 최적화 수행
+
+---
+
+## 🔄 4. 개발 서버(HMR) 동작 원리
+
+```plaintext
+브라우저 → dev server: import 요청
+           ↳ ESBuild로 실시간 변환 후 응답 (module 단위)
+
+파일 변경 발생 시:
+Vite → WebSocket → 브라우저에 HMR 메시지 전송
+브라우저는 해당 모듈만 reload
+```
+
+### ✅ 결과: 즉시 반응하는 HMR, 빠른 피드백 루프
+
+---
+
+## 📁 5. 기본 디렉토리 구조
+
+```bash
+vite-project/
+├── index.html         ← 엔트리포인트
+├── vite.config.js     ← 설정 파일
+└── src/
+    ├── main.tsx       ← 진입점 (React 기준)
+    └── App.tsx
+```
+
+---
+
+## 📦 6. 설치 및 기본 사용법
+
+```bash
+# 1. 프로젝트 생성
+npm create vite@latest my-vite-app
+
+# 2. 프레임워크 선택 (React, Vue, Svelte 등)
+
+# 3. 의존성 설치
+cd my-vite-app
+npm install
+
+# 4. 개발 서버 실행
+npm run dev
+```
+
+### 🔍 주요 명령어
+
+| 명령어               | 설명                              |
+| ----------------- | ------------------------------- |
+| `npm run dev`     | 개발 서버 실행 (ESBuild + Native ESM) |
+| `npm run build`   | Rollup으로 프로덕션 번들 생성             |
+| `npm run preview` | 빌드된 정적 파일을 로컬에서 미리보기            |
+
+---
+
+## 🧪 7. Vite vs Webpack 성능 비교
+
+| 항목            | Webpack            | Vite                         |
+| ------------- | ------------------ | ---------------------------- |
+| Cold Start    | 느림 (전체 번들링 필요)     | **즉시 시작 (ESM 요청만 변환)**       |
+| HMR 속도        | 느림 (전체 모듈 그래프 탐색)  | **빠름 (부분적 ESM 모듈만 변경)**      |
+| TypeScript 처리 | ts-loader or babel | **ESBuild 기반 20\~30배 빠름**    |
+| 설정 복잡도        | 복잡                 | 단순                           |
+| 빌드 성능         | 중간 (Terser 사용)     | **빠름 (Rollup + ESBuild 활용)** |
+
+---
+
+## 🔌 8. 플러그인 생태계
+
+Vite는 Rollup 플러그인을 그대로 사용 가능하며, **Vite 전용 플러그인**도 존재합니다.
+
+```js
+// vite.config.js
+import vue from '@vitejs/plugin-vue'
+
+export default {
+  plugins: [vue()]
+}
+```
+
+대표 플러그인:
+
+* `@vitejs/plugin-react`
+* `@vitejs/plugin-vue`
+* `vite-plugin-pwa`
+* `vite-plugin-pages` (파일 기반 라우팅)
+
+---
+
+## 🛡️ 9. 고급 설정: vite.config.ts
+
+```ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 3000,
+    open: true,
+    proxy: {
+      '/api': 'http://localhost:8080'
+    }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true
+  }
+})
+```
+
+---
+
+## 🧰 10. 실전 프로젝트 구조 예시 (React 기반)
+
+```
+vite-react-app/
+├── public/
+│   └── favicon.ico
+├── src/
+│   ├── assets/
+│   ├── components/
+│   ├── pages/
+│   ├── App.tsx
+│   └── main.tsx
+├── index.html
+├── vite.config.ts
+└── tsconfig.json
+```
+
+---
+
+## 📘 11. 결론: 왜 Vite를 선택해야 하는가?
+
+### ✅ 추천 대상
+
+* 빠른 HMR과 개발 환경이 필요한 **SPA(React/Vue/Svelte) 프로젝트**
+* Webpack 설정에 지친 팀
+* TypeScript와 JSX를 동시에 사용하는 경우
+* Micro Frontend와 같이 모듈화가 중요한 시스템
+
+### ✅ 장점 정리
+
+| 특징       | 설명                      |
+| -------- | ----------------------- |
+| 빠른 개발 서버 | ESM 기반으로 on-demand 변환   |
+| 즉각적인 HMR | WebSocket을 통한 모듈 단위 리로드 |
+| 빠른 빌드    | ESBuild + Rollup 조합     |
+| 간편한 설정   | zero-config 기반          |
+
+---
+
+## 📦 보너스: React + TypeScript + Vite 초기 템플릿
+
+```bash
+npm create vite@latest vite-ts-react -- --template react-ts
+cd vite-ts-react
+npm install
+npm run dev
+```
+
