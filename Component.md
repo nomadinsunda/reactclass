@@ -1,0 +1,180 @@
+
+
+# ✅ React Component
+
+---
+
+## 1. 💡 컴포넌트란?
+
+React에서 \*\*컴포넌트(Component)\*\*는 UI를 구성하는 **작은 블록 단위**입니다.
+**화면(View)을 재사용 가능한 단위로 쪼개는 설계 방법**입니다.
+
+* 마치 레고처럼 조립하듯 UI를 구성할 수 있습니다.
+* 컴포넌트는 **JSX 문법**을 통해 UI를 반환하는 **함수**입니다.
+
+---
+
+## 2. 📛 컴포넌트 이름 규칙
+
+React 컴포넌트의 이름은 **반드시 대문자로 시작**해야 합니다.
+
+| 올바른 예      | 잘못된 예                                |
+| ---------- | ------------------------------------ |
+| `Header`   | `header` (❌ JSX 요소로 해석됨)             |
+| `UserCard` | `usercard` (❌ JSX HTML 태그로 처리될 수 있음) |
+
+---
+
+## 3. 🧩 컴포넌트 구조 예시
+
+```jsx
+function Welcome(props) {
+  return <h2>환영합니다, {props.name}님!</h2>;
+}
+```
+
+* 함수 이름: `Welcome`
+* JSX 반환
+* props: 부모가 전달한 데이터
+
+---
+
+## 4. 📦 루트 컴포넌트란?
+
+* **앱 전체를 감싸는 최상위 컴포넌트**
+* 보통 `App.jsx` 혹은 `App.tsx`가 루트 컴포넌트 역할을 합니다.
+* `main.jsx` 또는 `index.js`에서 `ReactDOM.createRoot(...).render(<App />)` 형식으로 진입합니다.
+
+```jsx
+// main.jsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.jsx'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+)
+```
+
+---
+
+## 5. 👨‍👩‍👧‍👦 부모-자식 컴포넌트 관계
+
+* **부모 컴포넌트**가 **자식 컴포넌트를 포함**하고, 데이터를 props로 전달합니다.
+* 자식은 props를 통해 부모로부터 전달된 데이터를 표시합니다.
+
+```jsx
+// Welcome.jsx
+function Welcome(props) {
+  return <h2>안녕하세요, {props.name}님!</h2>;
+}
+
+export default Welcome;
+```
+
+```jsx
+// App.jsx (부모 컴포넌트)
+import Welcome from './components/Welcome';
+
+function App() {
+  return (
+    <div>
+      <h1>React 컴포넌트 구조</h1>
+      <Welcome name="홍길동" />
+      <Welcome name="김개발" />
+    </div>
+  );
+}
+
+export default App;
+```
+
+---
+
+## 6. 🧪 실습용 전체 코드 구성
+
+```
+vite-react-app/
+├── src/
+│   ├── App.jsx              // 루트 컴포넌트 (부모)
+│   ├── main.jsx             // 진입점
+│   ├── components/
+│   │   └── Welcome.jsx      // 자식 컴포넌트
+```
+
+---
+
+### ✅ Welcome.jsx (자식 컴포넌트)
+
+```jsx
+function Welcome(props) {
+  return (
+    <div>
+      <p>안녕하세요, {props.name}님!</p>
+    </div>
+  );
+}
+
+export default Welcome;
+```
+
+---
+
+### ✅ App.jsx (루트 컴포넌트, 부모)
+
+```jsx
+import Welcome from './components/Welcome';
+
+function App() {
+  return (
+    <div>
+      <h1>👋 리액트 컴포넌트 실습</h1>
+      <Welcome name="홍길동" />
+      <Welcome name="김코딩" />
+    </div>
+  );
+}
+
+export default App;
+```
+
+---
+
+### ✅ main.jsx (애플리케이션 진입점)
+
+```jsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App.jsx';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+```
+
+---
+
+## 7. 📚 props vs state
+
+| 구분 | props                | state                     |
+| -- | -------------------- | ------------------------- |
+| 정의 | 부모 → 자식으로 전달되는 데이터   | 컴포넌트 내부에서 관리되는 데이터        |
+| 수정 | 자식 컴포넌트는 props 수정 불가 | state는 setState로 내부 수정 가능 |
+| 용도 | 데이터 전달               | UI 변경 반영용 상태 관리           |
+
+---
+
+## 8. 🔍 실전 요약
+
+| 개념         | 설명                                      |
+| ---------- | --------------------------------------- |
+| 컴포넌트       | UI를 구성하는 독립적인 단위                        |
+| 루트 컴포넌트    | 앱의 최상위 컴포넌트 (`App.jsx`)                 |
+| 부모-자식 컴포넌트 | 상위 컴포넌트가 하위 컴포넌트를 포함하고 props를 통해 데이터 전달 |
+| JSX        | JavaScript 안에서 HTML처럼 작성하는 문법           |
+| props      | 컴포넌트 간 데이터 전달용 읽기 전용 객체                 |
+
