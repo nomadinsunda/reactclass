@@ -1,0 +1,152 @@
+# 📘 DOM 이벤트란?
+
+## ✅ 1. 정의
+
+**DOM 이벤트(DOM Event)** 란, 브라우저에서 발생하는 **사용자 상호작용 또는 시스템 변화에 대한 알림**입니다.
+
+* 사용자가 **클릭**하면 → `click` 이벤트
+* 사용자가 **키보드 입력**을 하면 → `keydown`, `keyup`
+* 페이지가 로드되면 → `load` 이벤트
+* 입력창에 글자가 바뀌면 → `input`, `change`
+
+DOM(EventTarget)은 이런 이벤트가 발생했을 때 \*\*핸들러 함수(Event Listener)\*\*를 통해 **반응**할 수 있도록 해줍니다.
+
+---
+
+## ✅ 2. 기본 구조
+
+### 🔸 HTML 방식
+
+```html
+<button onclick="alert('클릭!')">누르기</button>
+```
+
+> ❌ 유지보수와 보안 측면에서 좋지 않음
+
+---
+
+### 🔸 자바스크립트 방식 (정석)
+
+```html
+<button id="myBtn">눌러봐</button>
+<script>
+  const btn = document.getElementById("myBtn");
+  btn.addEventListener("click", function () {
+    alert("버튼 클릭됨!");
+  });
+</script>
+```
+
+| 요소                    | 설명                    |
+| --------------------- | --------------------- |
+| `addEventListener`    | 이벤트를 구독하는 함수          |
+| `"click"`             | 이벤트 종류                |
+| `function () { ... }` | 이벤트 발생 시 실행할 함수 (핸들러) |
+
+---
+
+## ✅ 3. 주요 DOM 이벤트 종류
+
+| 이벤트 이름                         | 설명        |
+| ------------------------------ | --------- |
+| `click`                        | 클릭할 때     |
+| `dblclick`                     | 더블 클릭할 때  |
+| `mousedown`, `mouseup`         | 마우스 눌림/떼짐 |
+| `mouseover`, `mouseout`        | 마우스 진입/이탈 |
+| `keydown`, `keyup`, `keypress` | 키보드 입력    |
+| `input`, `change`              | 입력값 변경    |
+| `submit`                       | 폼 제출      |
+| `load`, `DOMContentLoaded`     | 페이지 로딩 완료 |
+
+---
+
+## ✅ 4. 이벤트 객체 (Event Object)
+
+```javascript
+btn.addEventListener("click", function (event) {
+  console.log(event.target); // 클릭된 요소
+  console.log(event.type);   // click
+});
+```
+
+이벤트 핸들러는 자동으로 `Event` 객체를 받습니다. 이 객체에는 발생한 이벤트에 대한 상세 정보가 들어있습니다.
+
+---
+
+## ✅ 5. 이벤트 전파 (Capturing vs Bubbling)
+
+DOM 이벤트는 두 단계로 전파됩니다:
+
+1. **Capturing Phase** (외부 → 내부)
+2. **Target Phase**
+3. **Bubbling Phase** (내부 → 외부)
+
+예를 들어:
+
+```html
+<div id="outer">
+  <button id="inner">클릭</button>
+</div>
+```
+
+```javascript
+document.getElementById("outer").addEventListener("click", () => {
+  console.log("outer click");
+});
+
+document.getElementById("inner").addEventListener("click", () => {
+  console.log("inner click");
+});
+```
+
+* `inner` → `outer` 순으로 출력됨 (버블링)
+
+`event.stopPropagation()`을 호출하면 전파를 막을 수 있습니다.
+
+---
+
+## ✅ 6. DOM 이벤트 vs React 이벤트 차이
+
+| 항목     | DOM 이벤트                         | React 이벤트                        |
+| ------ | ------------------------------- | -------------------------------- |
+| 이벤트 등록 | `addEventListener`              | `onClick={handler}`              |
+| 명명법    | 소문자 `"click"`                   | 카멜케이스 `onClick`                  |
+| 전파 방식  | 실제 DOM 기반                       | React SyntheticEvent 기반 (가상 DOM) |
+| 이벤트 객체 | `MouseEvent`, `KeyboardEvent` 등 | `SyntheticEvent` (Wrapper 객체)    |
+
+React는 **모든 이벤트를 SyntheticEvent라는 래퍼 객체로 통합**하여 성능과 일관성을 높입니다.
+
+---
+
+## ✅ 7. 실습 예제
+
+```html
+<button id="nativeBtn">DOM 버튼</button>
+<script>
+  const nativeBtn = document.getElementById("nativeBtn");
+  nativeBtn.addEventListener("click", (e) => {
+    alert("💥 DOM 버튼 클릭됨!");
+  });
+</script>
+```
+
+```jsx
+function ReactButton() {
+  const handleClick = (e) => {
+    alert("⚛️ React 버튼 클릭!");
+  }
+
+  return <button onClick={handleClick}>React 버튼</button>
+}
+```
+
+---
+
+## ✅ 결론 요약
+
+* DOM 이벤트는 브라우저에서 UI 상호작용을 감지하는 핵심 메커니즘
+* addEventListener()를 사용해 핸들러 등록
+* React는 이를 추상화하여 `onClick`, `onChange`와 같은 props 형태로 제공
+* 이벤트 버블링, stopPropagation, preventDefault도 동일하게 적용됨
+
+
