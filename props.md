@@ -1,0 +1,172 @@
+# 📘 Vite + React 기반 `props` 강의 콘텐츠
+
+## ✅ 강의 목표
+
+* `props`의 개념 이해
+* 부모 → 자식 컴포넌트로 데이터 전달
+* props의 불변성
+* JSX에서 props 사용하는 방법
+* 여러 props 전달 방식 (객체 분해, 조건부 렌더링 등)
+
+---
+
+## 🧠 1. props란?
+
+**props**는 "properties"의 줄임말로, **부모 컴포넌트가 자식 컴포넌트에 전달하는 데이터**입니다. React 컴포넌트는 props를 통해 재사용성과 확장성을 갖습니다.
+
+```jsx
+<Welcome name="홍길동" />
+```
+
+위 코드는 `name`이라는 props를 `Welcome` 컴포넌트에 전달합니다.
+
+---
+
+## 📌 2. props 특징
+
+| 특징         | 설명                                |
+| ---------- | --------------------------------- |
+| 읽기 전용      | 자식 컴포넌트는 props를 변경할 수 없음 (불변성 유지) |
+| 단방향 데이터 흐름 | 부모 → 자식으로만 전달됨                    |
+| 재사용성 증가    | 다양한 값을 props로 전달함으로써 컴포넌트의 유연성 향상 |
+
+---
+
+## 🧪 3. 실습 프로젝트 구조 (Vite 기반)
+
+```
+props-demo/
+├── index.html
+├── package.json
+├── vite.config.js
+├── /src
+│   ├── main.jsx
+│   ├── App.jsx
+│   └── components
+│       ├── Welcome.jsx
+│       └── UserCard.jsx
+```
+
+---
+
+## ⚙️ 4. 프로젝트 초기화 명령어
+
+```bash
+npm create vite@latest props-demo -- --template react
+cd props-demo
+npm install
+npm run dev
+```
+
+---
+
+## 💻 5. 샘플 코드
+
+### 📄 `main.jsx`
+
+```jsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+)
+```
+
+---
+
+### 📄 `App.jsx`
+
+```jsx
+import React from 'react'
+import Welcome from './components/Welcome'
+import UserCard from './components/UserCard'
+
+function App() {
+  return (
+    <div>
+      <h1>React Props Demo</h1>
+      <Welcome name="홍길동" />
+      <UserCard
+        name="김코딩"
+        age={25}
+        isActive={true}
+        hobbies={['축구', '프로그래밍', '영화']}
+      />
+    </div>
+  )
+}
+
+export default App
+```
+
+---
+
+### 📄 `components/Welcome.jsx`
+
+```jsx
+import React from 'react'
+
+function Welcome(props) {
+  return <h2>👋 안녕하세요, {props.name}님!</h2>
+}
+
+export default Welcome
+```
+
+---
+
+### 📄 `components/UserCard.jsx`
+
+```jsx
+import React from 'react'
+
+function UserCard({ name, age, isActive, hobbies }) {
+  return (
+    <div style={{ border: '1px solid gray', marginTop: '10px', padding: '10px' }}>
+      <h3>{name}</h3>
+      <p>나이: {age}</p>
+      <p>활성 상태: {isActive ? '✅ 활성' : '❌ 비활성'}</p>
+      <p>취미:</p>
+      <ul>
+        {hobbies.map((hobby, idx) => (
+          <li key={idx}>{hobby}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+export default UserCard
+```
+
+---
+
+## 📚 6. props 실습 퀴즈
+
+1. `props`는 어떤 방향으로 데이터를 전달하나요?
+2. 자식 컴포넌트에서 props를 수정할 수 있나요?
+3. `props.name` 대신 구조 분해를 하려면 어떻게 하나요?
+4. 배열, 객체 형태의 데이터를 props로 전달할 수 있나요?
+
+---
+
+## 🧑‍🏫 추가 실습 아이디어
+
+* 부모 컴포넌트에서 버튼 클릭 시 자식에게 props로 다른 값 전달해보기
+* 조건부 렌더링 (`isLoggedIn` prop 활용)
+* 함수형 props 전달 (예: 버튼 클릭 핸들러)
+
+---
+
+## ❓ props vs state 간단 비교
+
+| 구분       | props     | state             |
+| -------- | --------- | ----------------- |
+| 소유자      | 부모로부터 전달됨 | 컴포넌트 내부에서 관리      |
+| 수정 가능 여부 | 읽기 전용     | setState()로 수정 가능 |
+| 목적       | 데이터 전달    | 컴포넌트 내부 상태 저장     |
+
