@@ -1,0 +1,121 @@
+# ✅ Node.js + npm 기초 실습
+
+## 📌 실습 목표
+
+* `npm`의 기본 개념 이해
+* Node.js 프로젝트 초기화
+* 외부 라이브러리 설치 및 사용
+* 로컬 서버 실행
+
+---
+
+## 📁 폴더 구조
+
+```
+npm-demo/
+├── package.json       ← npm 프로젝트 정보
+├── index.js           ← 메인 실행 파일
+```
+
+---
+
+## 🧭 1단계: 프로젝트 폴더 만들기
+
+```bash
+mkdir npm-demo
+cd npm-demo
+```
+
+---
+
+## 🧭 2단계: `npm init`으로 프로젝트 초기화
+
+```bash
+npm init -y
+```
+
+`-y` 옵션은 기본값으로 자동 생성
+
+💡 생성된 `package.json` 파일은 프로젝트의 중심 역할을 하며, 설치한 라이브러리 목록, 스크립트 등을 관리합니다.
+
+---
+
+## 🧭 3단계: 외부 라이브러리 설치하기
+
+예: 날짜와 시간 처리를 위한 `dayjs` 라이브러리 설치
+
+```bash
+npm install dayjs
+```
+
+설치 후 `package.json`의 `dependencies`에 추가되고, `node_modules/` 폴더가 생깁니다.
+
+---
+
+## 🧭 4단계: 코드 작성 (`index.js`)
+
+```js
+// index.js
+const dayjs = require('dayjs');
+
+const now = dayjs();
+console.log("🕒 현재 시간:", now.format('YYYY-MM-DD HH:mm:ss'));
+```
+
+---
+
+## 🧭 5단계: 실행하기
+
+```bash
+node index.js
+```
+
+```
+🕒 현재 시간: 2025-07-23 11:00:00
+```
+
+---
+
+## 💡 추가 실습: `figlet`으로 ASCII 아트 출력
+
+```bash
+npm install figlet
+```
+
+```js
+// index.js
+const figlet = require('figlet');
+
+figlet('Hello NPM!', (err, data) => {
+  if (err) {
+    console.log('❌ 에러 발생');
+    return;
+  }
+  console.log(data);
+});
+```
+
+```bash
+node index.js
+```
+
+```
+ _   _      _ _        __        __         _     _
+| \ | | ___| | | ___   \ \      / /__  _ __| | __| |
+|  \| |/ _ \ | |/ _ \   \ \ /\ / / _ \| '__| |/ _` |
+| |\  |  __/ | | (_) |   \ V  V / (_) | |  | | (_| |
+|_| \_|\___|_|_|\___/     \_/\_/ \___/|_|  |_|\__,_|
+```
+
+---
+
+## 📦 정리: `npm`이란?
+
+| 항목                      | 설명        |
+| ----------------------- | --------- |
+| `npm init`              | 프로젝트 초기화  |
+| `npm install 패키지명`      | 패키지 설치    |
+| `require()` 또는 `import` | 설치한 모듈 사용 |
+| `node index.js`         | 실행        |
+
+
