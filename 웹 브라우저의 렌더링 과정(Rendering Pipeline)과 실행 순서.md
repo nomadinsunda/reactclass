@@ -15,7 +15,7 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 웹 브라우저는 다음과 같은 **단계적 처리 파이프라인**을 통해 웹 페이지를 화면에 표시합니다.
 
 
-<img src="./images/render_pipeline_vertical.svg" width=50% /><br>
+<img src="./images/render_pipeline_vertical.svg" width=50% height="auto" /><br>
 
 ---
 
@@ -63,7 +63,7 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 
 ### ▶️ DOM 트리 구조
 
-<img src="./images/domtree.svg" width=90% /><br>
+<img src="./images/domtree.svg" width=50% height="auto" /><br>
 
 > 📌 `<script>` 태그를 만나면 **HTML 파싱은 중단**되고, JS 엔진이 해당 스크립트를 먼저 실행합니다.
 
