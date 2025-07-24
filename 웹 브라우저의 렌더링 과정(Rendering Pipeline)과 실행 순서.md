@@ -4,7 +4,7 @@
 
 > HTML과 CSS, JavaScript가 어떻게 브라우저에서 픽셀로 변환되어 사용자에게 보여지는가?
 
-프론트엔드 개발자로서 \*\*렌더링 파이프라인(Rendering Pipeline)\*\*에 대한 이해는 퍼포먼스 최적화의 핵심입니다.
+프론트엔드 개발자로서 **렌더링 파이프라인(Rendering Pipeline)** 에 대한 이해는 퍼포먼스 최적화의 핵심입니다.
 이 글에서는 **렌더링의 내부 구조와 흐름을 전문가 관점에서** 설명하고,
 JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치는지까지 정리합니다.
 
@@ -15,7 +15,7 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 웹 브라우저는 다음과 같은 **단계적 처리 파이프라인**을 통해 웹 페이지를 화면에 표시합니다.
 
 
-<img src="./images/render_pipeline_vertical.svg" width=60% /><br>
+<img src="./images/render_pipeline_vertical.svg" width=50% /><br>
 
 ---
 
