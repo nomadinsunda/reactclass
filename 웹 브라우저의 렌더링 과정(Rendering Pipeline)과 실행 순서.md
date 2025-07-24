@@ -14,9 +14,8 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 
 웹 브라우저는 다음과 같은 **단계적 처리 파이프라인**을 통해 웹 페이지를 화면에 표시합니다.
 
-```
-[Loading] → [HTML/CSS Parsing] → [DOM + CSSOM 생성] → [Render Tree] → [Layout] → [Paint] → [Compositing]
-```
+
+<img src="./images/render_pipeline_vertical.svg" width=90% /><br>
 
 ---
 
@@ -47,12 +46,16 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Example</title>
+    <meta charset="UTF-8">
+    <title>Demo</title>
   </head>
   <body>
-    <div id="root">
-      <h1>Hello</h1>
-      <p><strong>Welcome</strong> to the browser</p>
+    <div id="container">
+      <h1>Welcome</h1>
+      <section>
+        <p>This is a paragraph.</p>
+        <a href="#">Click here</a>
+      </section>
     </div>
   </body>
 </html>
@@ -60,17 +63,7 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 
 ### ▶️ DOM 트리 구조
 
-```
-Document
- └── html
-     ├── head
-     │   └── title
-     └── body
-         └── div#root
-             ├── h1
-             └── p
-                 └── strong
-```
+<img src="./images/domtree.svg" width=90% /><br>
 
 > 📌 `<script>` 태그를 만나면 **HTML 파싱은 중단**되고, JS 엔진이 해당 스크립트를 먼저 실행합니다.
 
@@ -221,3 +214,4 @@ JavaScript는 **싱글 스레드 기반**으로, 렌더링과 같은 **브라우
 * 애니메이션, 스크롤, 인터랙션 최적화
 * 레이아웃 구조 설계에 대한 직관
 
+<img src="./images/webrenderingseq.png" width=90% /><br>
