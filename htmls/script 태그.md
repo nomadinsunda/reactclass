@@ -38,7 +38,7 @@
 | 속성               | 설명                                          | 비고                             |
 | ---------------- | ------------------------------------------- | ------------------------------ |
 | `src`            | 외부 자바스크립트 파일 경로                             | **절대경로 / 상대경로 / CDN 등 가능**     |
-| `type`           | MIME 타입 (`text/javascript`, `module` 등)     | 기본값: `text/javascript` (생략 가능) |
+| `type`           | MIME 타입 (`text/javascript`, `module` 등)     | 디폴트값: `text/javascript` (생략 가능) |
 | `async`          | 외부 스크립트 **비동기 로드 + 병렬 실행**                  | HTML 파싱과 병렬, 실행 순서 제어 어려움      |
 | `defer`          | 외부 스크립트 **비동기 로드 + HTML 파싱 완료 후 실행**        | 문서 구조 유지 필요 시 권장               |
 | `crossorigin`    | CORS 정책 설정 (`anonymous`, `use-credentials`) | 외부 CDN 로딩 시 유용                 |
