@@ -104,7 +104,7 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 
 ## 6️⃣ Paint (Rasterization)
 
-* 각 노드를 \*\*픽셀로 변환(painting)\*\*하여 실제 시각 요소를 렌더링합니다.
+* 각 노드를 **픽셀로 변환(painting)** 하여 실제 시각 요소를 렌더링합니다.
 * 색상, 배경, 그림자, 이미지 등이 포함됩니다.
 * **GPU 가속**이 지원되는 브라우저는 이 작업을 더 빠르게 수행합니다.
 
@@ -112,8 +112,8 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 
 ## 7️⃣ Compositing (합성 단계)
 
-* Paint된 레이어를 GPU에서 \*\*합성(Compositing)\*\*하여 최종 화면을 만듭니다.
-* 일부 요소들은 별도의 \*\*레벨(layer)\*\*로 분리되어 처리됩니다:
+* Paint된 레이어를 GPU에서 **합성(Compositing)** 하여 최종 화면을 만듭니다.
+* 일부 요소들은 별도의 **레벨(layer)** 로 분리되어 처리됩니다:
 
   * `will-change`, `transform`, `opacity` 등
 
@@ -165,23 +165,7 @@ JavaScript는 **싱글 스레드 기반**으로, 렌더링과 같은 **브라우
 
 ---
 
-## ⏱ Critical Rendering Path 요약
 
-```plaintext
-[HTML 수신]
-  ↓
-[DOM 트리 생성] + [CSSOM 생성]
-  ↓
-[Render Tree 생성]
-  ↓
-[Layout 계산]
-  ↓
-[Paint → Composite]
-  ↓
-✅ 화면에 표시 (First Paint)
-```
-
----
 
 ## ⚙ 전문가용 최적화 팁
 
