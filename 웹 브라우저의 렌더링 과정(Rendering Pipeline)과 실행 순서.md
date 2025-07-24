@@ -15,7 +15,7 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 웹 브라우저는 다음과 같은 **단계적 처리 파이프라인**을 통해 웹 페이지를 화면에 표시합니다.
 
 
-<img src="./images/render_pipeline_vertical.svg" width=90% /><br>
+<img src="./images/render_pipeline_vertical.svg" width=60% /><br>
 
 ---
 
