@@ -15,7 +15,7 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 웹 브라우저는 다음과 같은 **단계적 처리 파이프라인**을 통해 웹 페이지를 화면에 표시합니다.
 
 
-<img src="./images/render_pipeline_vertical.svg" width=50% height="auto" /><br>
+<img src="./images/render_pipeline_vertical.svg" width=40% height="auto" /><br>
 
 ---
 
@@ -119,24 +119,7 @@ JavaScript 실행이 **Critical Rendering Path**에 어떻게 영향을 미치�
 
 ---
 
-## 🖼 렌더링 파이프라인 시각 요약
 
-```
-HTML     →    DOM
-CSS      →    CSSOM
-             ↓
-        Render Tree
-             ↓
-          Layout
-             ↓
-          Paint
-             ↓
-        Compositing
-             ↓
-      🖥 사용자 화면에 출력
-```
-
----
 
 ## 🎯 Reflow vs Repaint: 성능에 민감한 변화
 
