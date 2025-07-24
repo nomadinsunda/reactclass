@@ -1,6 +1,4 @@
-아니요, **Virtual DOM(V-DOM)** 은 **웹 표준이 아닙니다.**
 
----
 
 ## ✅ Virtual DOM은 무엇인가?
 
