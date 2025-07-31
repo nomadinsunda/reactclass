@@ -1,0 +1,129 @@
+# 🧩 `React Router`의 `<Outlet />`이란?
+
+## ✅ 정의
+
+`<Outlet />`은 **React Router에서 중첩 라우팅(Nested Routing)** 시
+하위 라우트의 컴포넌트를 **렌더링하는 자리**를 의미하는 특별한 컴포넌트입니다.
+
+---
+
+## 💡 쉽게 말하면:
+
+> `Outlet`은 \*\*"여기다가 자식 라우트 컴포넌트 넣어줘"\*\*라는 뜻입니다.
+
+---
+
+## 🧪 왜 필요한가?
+
+React Router에서는 다음과 같은 중첩 구조가 가능합니다:
+
+```jsx
+<Routes>
+  <Route path="/" element={<Layout />}>
+    <Route path="users" element={<Users />} />
+  </Route>
+</Routes>
+```
+
+* 이때 `/users` 경로에 들어갔을 때,
+  `<Users />` 컴포넌트를 **어디에 보여줄지** 지정해줘야 하는데,
+  그 자리가 바로 `<Layout />` 안의 `<Outlet />`입니다.
+
+---
+
+## 🔧 Outlet 없이 이런 식이면...
+
+```jsx
+const Layout = () => (
+  <div>
+    <nav> ... </nav>
+    {/* ❌ <Outlet />이 없다면 /users로 들어가도 Users 컴포넌트가 안보임 */}
+  </div>
+);
+```
+
+→ 경로는 바뀌어도 화면은 변하지 않음
+→ 왜? Outlet이 없으면 자식이 **끼어들 공간이 없기 때문**
+
+---
+
+# ✅ 요약
+
+| 개념           | 설명                              |
+| ------------ | ------------------------------- |
+| `<Outlet />` | 현재 라우트에 매칭된 자식 컴포넌트를 "끼워 넣는 자리" |
+| 위치           | 상위 라우트의 컴포넌트 안                  |
+| 왜 필요?        | 중첩 구조에서 자식이 어디 들어가야 할지를 알려줌     |
+| 없으면?         | 아무리 `<Route>`를 정의해도 자식은 보이지 않음  |
+
+---
+
+# 🧾 예제 코드 — `<Outlet />`이 실제로 쓰이는 예시
+
+```jsx
+import React from 'react';
+import { Outlet, Link } from 'react-router-dom';
+
+const Layout = () => (
+  <div>
+    <nav style={{ marginBottom: 20 }}>
+      <Link to="/">Home</Link> |{" "}
+      <Link to="/users">Users</Link> |{" "}
+      <Link to="/search?query=test">Search</Link>
+    </nav>
+    <Outlet />
+  </div>
+);
+
+export default Layout;
+```
+
+---
+
+## 📌 이 코드는 어떤 구조인가?
+
+1. `Layout`은 모든 페이지에서 **공통으로 렌더링되는 상위 컴포넌트**입니다.
+2. 상단 메뉴(`<nav>`)는 항상 표시됩니다.
+3. `<Outlet />`은 현재 URL 경로에 매칭된 **하위 컴포넌트가 들어가는 자리**입니다.
+
+---
+
+### 📍 예: 라우트 설정이 이렇게 되어 있다고 가정
+
+```jsx
+<Routes>
+  <Route path="/" element={<Layout />}>
+    <Route index element={<Home />} />
+    <Route path="users" element={<Users />} />
+    <Route path="search" element={<Search />} />
+  </Route>
+</Routes>
+```
+
+* `/` 접속 시 → `<Home />` 컴포넌트가 `<Outlet />` 자리에 렌더링
+* `/users` 접속 시 → `<Users />` 컴포넌트가 `<Outlet />` 자리에 렌더링
+* `/search` 접속 시 → `<Search />` 컴포넌트가 `<Outlet />` 자리에 렌더링
+
+---
+
+## 🎯 실제 DOM 렌더링 결과 예시 (`/users`일 때)
+
+```html
+<div>
+  <nav>
+    Home | Users | Search
+  </nav>
+
+  <!-- Outlet 자리에 들어간 컴포넌트 -->
+  <div>Users 페이지의 내용</div>
+</div>
+```
+
+---
+
+## ✅ 결론
+
+`<Outlet />`은 위 코드에서:
+
+> 사용자가 `/`, `/users`, `/search` 등으로 이동할 때마다
+> 해당하는 컴포넌트를 **이 위치에** 렌더링하게 해주는 핵심 컴포넌트입니다.
