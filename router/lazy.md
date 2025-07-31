@@ -1,0 +1,135 @@
+# ⚙️ `React.lazy()`란?
+
+> `React.lazy()`는 컴포넌트를 **지연(lazy) 로딩**할 수 있도록 해주는 React API입니다.
+> 즉, **해당 컴포넌트를 실제로 "사용하는 순간"까지는 번들에 포함하지 않고**,
+> **그 시점에 네트워크로 가져오게 합니다.**
+
+```js
+const MyComponent = React.lazy(() => import('./MyComponent'));
+```
+
+📦 \*\*코드 스플리팅(Code Splitting)\*\*의 핵심 기술 중 하나입니다.
+
+---
+
+## 🎯 목적
+
+* 앱의 **초기 로딩 속도 개선**
+* **코드 스플리팅**을 쉽게 구현
+* **사용자 경험 향상** (필요한 시점에 필요한 컴포넌트만 로드)
+
+---
+
+# 🧪 기본 사용법
+
+```jsx
+import React, { Suspense, lazy } from 'react';
+
+const Settings = lazy(() => import('./pages/Settings'));
+
+function App() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <Settings />
+    </Suspense>
+  );
+}
+```
+
+### ✅ 설명
+
+| 부분                        | 의미                                      |
+| ------------------------- | --------------------------------------- |
+| `lazy(() => import(...))` | 컴포넌트를 비동기 로딩                            |
+| `import()`                | **Promise**를 반환하는 동적 import (ES2020 표준) |
+| `Suspense`                | 로딩 중 fallback UI를 보여줌 (필수)              |
+
+---
+
+# ⚙️ 내부 작동 메커니즘
+
+1. `lazy(() => import('./SomeComponent'))` 호출 시, React는 아직 컴포넌트를 가져오지 않음
+2. 해당 컴포넌트가 실제로 렌더링되려는 시점에 `import()` 실행됨
+3. 컴포넌트 로드 전까지 `Suspense`의 fallback UI를 보여줌
+4. 컴포넌트가 로드되면, 정상적으로 렌더링
+
+---
+
+# 🧩 React.lazy()의 조건
+
+| 조건                 | 설명                                     |
+| ------------------ | -------------------------------------- |
+| ❗ default export   | lazy 대상 컴포넌트는 반드시 `export default`여야 함 |
+| ✅ Suspense와 함께 사용  | fallback 없으면 에러 발생                     |
+| ✅ Client-side only | SSR에서는 사용 불가 또는 대체 전략 필요               |
+
+---
+
+# 🧠 실전 예시: 페이지별 분할
+
+```jsx
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Profile = lazy(() => import('./pages/Profile'));
+
+<Suspense fallback={<PageSkeleton />}>
+  <Routes>
+    <Route path="/dashboard" element={<Dashboard />} />
+    <Route path="/profile" element={<Profile />} />
+  </Routes>
+</Suspense>
+```
+
+📌 라우팅 기반으로 페이지 컴포넌트를 lazy 로드하면,
+
+* 각 페이지별 번들이 **필요할 때만 로드**되고,
+* 초기 로딩 시 payload가 줄어듭니다.
+
+---
+
+# 🚨 React.lazy()의 한계
+
+| 한계                    | 설명                                                    |
+| --------------------- | ----------------------------------------------------- |
+| SSR 미지원 (React 17 이하) | 서버에서는 `import()` 실행 불가                                |
+| named export 지원 X     | 반드시 default export만 가능                                |
+| 네트워크 오류 대응 없음         | 로딩 실패 시 fallback만 보여지고 에러 처리 어려움 (→ ErrorBoundary 필요) |
+
+---
+
+# 🧱 React.lazy + Suspense + ErrorBoundary 구조
+
+```jsx
+<ErrorBoundary>
+  <Suspense fallback={<Loading />}>
+    <LazyComponent />
+  </Suspense>
+</ErrorBoundary>
+```
+
+* 로딩 중: `<Loading />`
+* 성공 시: `<LazyComponent />`
+* 실패 시: `<ErrorBoundary />`
+
+---
+
+# 🧾 요약
+
+| 항목    | 설명                                       |
+| ----- | ---------------------------------------- |
+| 목적    | 컴포넌트를 **필요할 때만** 로딩하여 성능 향상              |
+| 동작 방식 | `import()` + Promise → Suspense fallback |
+| 필수 구성 | `React.lazy()` + `React.Suspense`        |
+| 제약사항  | default export 필수, SSR에서는 별도 대안 필요       |
+
+---
+
+## ✅ 언제 써야 하나?
+
+| 상황                 | 사용 권장             |
+| ------------------ | ----------------- |
+| 페이지 단위 라우팅         | ✅ 매우 적합           |
+| 무거운 모듈 (차트, 에디터 등) | ✅ 매우 적합           |
+| 처음엔 불필요한 컴포넌트      | ✅ 렌더링 시점 이후에 로드   |
+| 작은 컴포넌트            | ❌ 굳이 lazy하지 않아도 됨 |
+
+
