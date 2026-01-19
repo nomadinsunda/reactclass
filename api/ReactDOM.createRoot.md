@@ -1,4 +1,4 @@
-`createRoot`는 **React 18부터 도입된 “새 렌더링 엔진 진입점(Entry Point)”**입니다.
+`createRoot`는 **React 18부터 도입된 “새 렌더링 엔진 진입점(Entry Point)”** 입니다.
 한 줄 요약하면:
 
 > 👉 `ReactDOM.render` 시대를 끝내고, **Concurrent Rendering(동시성 렌더링)** 기능을 온전히 활용하기 위한 새로운 “루트 관리자”라고 보시면 됩니다.
@@ -29,7 +29,7 @@ root.render(<App />);
 여기서 핵심은:
 
 * 더 이상 `render()`를 **정적 함수**처럼 바로 호출하지 않고
-* 먼저 `createRoot()`로 **“루트 객체(root)”를 생성한 뒤**
+* 먼저 `createRoot()`로 **“루트 객체(ReactDOMRoot)”를 생성한 뒤**
 * 그 루트 객체가 가진 `render()` 메서드로 렌더링을 수행한다는 점입니다.
 
 즉,
@@ -58,7 +58,7 @@ React 팀이 굳이 API를 바꾸면서까지 도입한 이유는 **Concurrent R
 
 * 🧵 **Concurrent Rendering 지원**
   → React가 렌더링 작업을 잘게 쪼개어 나누고,
-  → 중간에 **“잠깐, 유저가 입력했네?”** 하면서 브라우저에게 제어를 넘길 수 있음
+  → 중간에 **“잠깐, User가 입력했네?”** 하면서 브라우저에게 제어를 넘길 수 있음
 * 🎯 **우선순위 기반 업데이트**
   → 사용자의 입력, 애니메이션처럼 중요한 작업을 먼저 처리
 * 🔁 **자동 배치(Automatic Batching) 강화**
@@ -204,14 +204,12 @@ root.render(
 );
 ```
 
-> 강의 시에는 “두 번 실행되는 것”을 버그가 아니라
-> **Concurrent Rendering 대비를 위한 안전장치**라고 강조하시면 좋습니다. 💡
+> **Concurrent Rendering 대비를 위한 안전장치** 💡
 
 ---
 
 ## 9. Vite + React 템플릿에서의 createRoot 구조 예시 🧪
 
-사용자님 맥락(Vite + React 강의) 기준의 예시를 들면:
 
 ```jsx
 // main.jsx
@@ -230,7 +228,7 @@ root.render(
 );
 ```
 
-슬라이드 포인트:
+포인트:
 
 * `main.jsx`는 **“React 애플리케이션의 부트스트랩 파일”**
 * 이 파일에서 **그냥 JSX를 렌더링하는 것이 아니라,**
@@ -238,11 +236,11 @@ root.render(
 
 ---
 
-## 10. 내부적으로 일어나는 일(개념적 흐름) 🧩
+## 10. 내부적으로 일어나는  🧩
 
 `createRoot(container)` 호출 시 개념적 단계:
 
-1. `container`(예: `<div id="root">`)를 인자로 받음
+1. `container`(예: `<div id="root">`)를 아규먼트로 받음
 2. React 내부에서 **Root Fiber 구조체 생성**
 3. 해당 컨테이너 DOM 노드와 Root Fiber를 **1:1로 매핑**
 4. 스케줄러(우선순위 관리), 업데이트 큐 등을 초기화
