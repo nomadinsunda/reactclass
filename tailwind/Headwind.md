@@ -55,6 +55,9 @@ Headwind는 두 가지 핵심 목적을 가집니다.
 
 # 🔧 Headwind는 어떻게 동작하는가?
 
+## ⭕ VS Code 확장 설치 
+> Extension Marketplace → “Headwind” 검색
+
 Headwind는 Tailwind CSS 공식 문서를 바탕으로
 **유틸리티 그룹 + 우선순위 체계**를 정의하고 있습니다.
 
@@ -96,7 +99,9 @@ VS Code 설정:
 }
 ```
 
-Headwind가 설치되어 있으면 클래스 정렬이 자동 적용됩니다.
+Headwind가 설치되어 있으면 클래스 정렬이 자동 적용됩니다.<br>
+
+
 
 ---
 
