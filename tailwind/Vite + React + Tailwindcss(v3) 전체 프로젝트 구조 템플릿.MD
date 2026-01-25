@@ -80,9 +80,8 @@ my-app/
 ### 2-2. Tailwind + PostCSS + Autoprefixer 설치
 
 ```bash
-npm install -D tailwindcss postcss autoprefixer
-npm i -D @tailwindcss/vite
-//npx tailwindcss init -p
+npm i -D tailwindcss@3 postcss autoprefixer
+npx tailwindcss init -p
 ```
 
 위 커맨드 라인은 다음과 동일합니다.
