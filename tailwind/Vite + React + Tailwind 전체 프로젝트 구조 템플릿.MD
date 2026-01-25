@@ -81,7 +81,8 @@ my-app/
 
 ```bash
 npm install -D tailwindcss postcss autoprefixer
-npx tailwindcss init -p
+npm i -D @tailwindcss/vite
+//npx tailwindcss init -p
 ```
 
 위 커맨드 라인은 다음과 동일합니다.
