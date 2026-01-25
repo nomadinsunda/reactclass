@@ -60,6 +60,10 @@ cd my-app
 npm install
 ```
 
+위 커맨드 라인은 다음과 동일합니다.
+> npm install --save-dev tailwindcss postcss autoprefixer
+> -D 옵션은 패키지를 개발 환경에서만 필요한 개발 의존성(devDependencies) 으로 설치한다는 의미입니다.
+
 이 시점에서 구조 예시:
 
 ```text
