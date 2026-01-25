@@ -488,3 +488,22 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 * React 엔트리(`main.jsx`)에서 Tailwind 지시어가 들어있는 CSS(`index.css`)를 import하면
   → 위 파이프라인이 모두 자동으로 연결된다.
 
+## 12. 추가 패키지 설치
+
+```
+npm i chance luxon @fontsource/material-icons
+npm i -D @types/chance @types/luxon
+```
+
+```
+npm i -D daisyui
+```
+
+아래 커맨드라인은 tailwind css 3.3 버전부터는 line-clamp 플러그인이 디폴트로 포함되므로 별도 설치를 할 필요가 없습니다.
+```
+npm i -D @tailwindcss/line-clamp
+```
+
+
+
+
