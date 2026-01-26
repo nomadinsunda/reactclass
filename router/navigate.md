@@ -1,0 +1,158 @@
+React Router에서 **`navigate`**는 라우터에게 **“URL을 변경하라”**고 지시하는 핵심 함수입니다.
+즉,
+
+> 🔥 **`navigate()` = 프로그래밍 방식으로 URL을 바꾸는 함수**
+> (→ 페이지 전체 새로고침 없이 SPA 방식 네비게이션 수행)
+
+---
+
+# 🚀 1. navigate란? (한 줄 정의)
+
+**`navigate`는 React Router가 제공하는 네비게이션 함수로,**
+**JS 코드에서 직접 URL을 변경하고 라우팅을 수행하도록 라우터에게 요청하는 함수입니다.**
+
+즉,
+
+* `<Link>` = UI 클릭 기반 이동
+* `navigate()` = 코드 기반 이동 (이벤트/조건/로직에 따라 이동)
+
+둘 다 결국 **라우터에게 “이 URL로 가주세요”**라고 요청합니다.
+
+---
+
+# 🔧 2. navigate는 어디서 오는가?
+
+React Router v6에서는 **`useNavigate()` 훅**을 통해 가져옵니다:
+
+```jsx
+import { useNavigate } from "react-router-dom";
+
+const navigate = useNavigate();
+```
+
+이렇게 하면:
+
+```js
+navigate("/about");
+```
+
+처럼 사용할 수 있는 함수가 생기며, URL 이동이 발생합니다.
+
+---
+
+# 🧠 3. navigate는 언제 쓰는가?
+
+### ✔ 1) 버튼 클릭 시 이동
+
+```jsx
+function LoginButton() {
+  const navigate = useNavigate();
+
+  const goToLogin = () => {
+    navigate("/login");
+  };
+
+  return <button onClick={goToLogin}>로그인 화면으로 이동</button>;
+}
+```
+
+### ✔ 2) API 요청 완료 후 자동 이동
+
+```jsx
+async function handleSave() {
+  await saveData();
+  navigate("/success");
+}
+```
+
+### ✔ 3) 조건/권한 체크에 따른 강제 이동 (보호 라우트)
+
+```jsx
+if (!isLoggedIn) navigate("/login");
+```
+
+### ✔ 4) URL 파라미터/쿼리 변경
+
+```jsx
+navigate("/users?sort=desc");
+```
+
+### ✔ 5) 뒤로 가기 / 앞으로 가기
+
+```jsx
+navigate(-1); // 뒤로
+navigate(1);  // 앞으로
+```
+
+---
+
+# 🧩 4. navigate의 내부 동작 (쉽게 설명)
+
+`navigate("/about")`이 실행되면 내부에서는 다음과 같이 동작합니다:
+
+1. `history.pushState("/about")` (URL만 변경, 새로고침 없음)
+2. React Router가 URL 변경 감지
+3. `<Routes>`가 새 URL과 `<Route>` 목록을 비교
+4. 매칭되는 `<Route path="/about">` 찾음
+5. 해당 Route의 `element`(예: `<AboutPage />`)을 렌더링
+
+즉,
+
+> ⛳ **navigate → History API 동작 → Router 매칭 → 새 페이지 렌더링**
+> (SPA 방식이라 빠르고 상태가 유지됨)
+
+---
+
+# 🧭 5. `<Link>` vs `navigate()` 비교
+
+| 구분    | `<Link>`          | `navigate()`   |
+| ----- | ----------------- | -------------- |
+| 성격    | UI 컴포넌트           | 함수             |
+| 이동 방식 | 유저 클릭 기반          | 코드 기반 자동 이동    |
+| 목적    | 화면에서 보이는 링크 제공    | 로직에 따라 이동 제어   |
+| 내부 동작 | navigate() 호출과 동일 | 직접 navigate 호출 |
+
+즉, 내부적으로 **`<Link>`도 클릭 시 navigate()를 호출합니다.**
+
+---
+
+# 🔥 6. 예제: 로그인 성공 후 이동하는 로직 예시
+
+```jsx
+function LoginPage() {
+  const navigate = useNavigate();
+
+  const onSubmit = async () => {
+    const loginSuccess = await login();
+
+    if (loginSuccess) {
+      navigate("/dashboard");
+    } else {
+      alert("로그인 실패");
+    }
+  };
+
+  return <button onClick={onSubmit}>로그인</button>;
+}
+```
+
+UI가 필요 없는 상황에서는 `<Link>`보다 **navigate**가 훨씬 유용합니다.
+
+---
+
+# 🎉 7. 한 문장 요약
+
+* **navigate는 React Router에서 URL을 변경하는 함수**
+* **useNavigate()로 가져와서 사용**
+* **네비게이션 UI가 필요 없는 모든 상황에서 사용**
+* **내부적으로 History API를 사용해 페이지 전체 새로고침 없이 이동**
+
+---
+
+참고 사항:
+
+📌 `navigate`의 replace 옵션
+📌 navigate를 이용한 Protected Route 구현
+📌 React Router의 history 객체 구조
+📌 navigate가 pushState/replaceState를 어떻게 사용하는지
+
