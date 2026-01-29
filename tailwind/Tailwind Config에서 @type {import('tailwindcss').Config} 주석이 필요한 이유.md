@@ -1,7 +1,7 @@
 # 🎯 결론:
 
 `/** @type {import('tailwindcss').Config} */`
-는 **“이 객체는 Tailwind의 Config 타입 구조를 따른다”**라는 의미의 **JSDoc 타입 선언(type annotation)** 입니다.
+는 **“이 객체는 Tailwind의 Config 타입 구조를 따른다”** 라는 의미의 **JSDoc 타입 선언(type annotation)** 입니다.
 
 즉,
 
