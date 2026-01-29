@@ -66,7 +66,7 @@ Vite + React + Tailwind + PostCSS 환경에서 흐름을 정리하면:
 
 ### 3-1. base 레이어의 역할
 
-`@tailwind base;` 는 말 그대로 **“기본 스타일 층(base layer)”**를 삽입하라는 의미입니다.
+`@tailwind base;` 는 말 그대로 **“기본 스타일 층(base layer)”** 를 삽입하라는 의미입니다.
 
 주요 내용:
 
@@ -139,7 +139,7 @@ a {
 
 ### 4-1. components 레이어의 역할
 
-`@tailwind components;` 는 **“컴포넌트 수준의 클래스들”**을 넣는 자리입니다.
+`@tailwind components;` 는 **“컴포넌트 수준의 클래스들”** 을 넣는 자리입니다.
 
 여기 들어오는 것들:
 
@@ -147,7 +147,7 @@ a {
 * `@layer components` 안에 내가 정의한 컴포넌트 스타일
 * 플러그인에서 제공하는 컴포넌트 스타일 (예: daisyUI의 `.btn`, `.card` 등)
 
-즉, 이 레이어는 **재사용 가능한 “덩어리 스타일”**들이 들어오는 곳입니다.
+즉, 이 레이어는 **재사용 가능한 “덩어리 스타일”** 들이 들어오는 곳입니다.
 
 ### 4-2. 예: 내가 만든 버튼 컴포넌트 클래스
 
@@ -425,13 +425,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 * 순서 `base → components → utilities` 는
   **CSS 우선순위 구조를 설계한 Tailwind 팀의 의도가 그대로 반영된 것**입니다.
 
-이제 학생들에게 설명하실 때,
+이제 정리하자면,
 
 > “세 줄은 Tailwind에게
 > ‘기본 세팅 넣고(base) → 컴포넌트 스타일 깔고(components) →
 > 마지막에 유틸리티 클래스들을 싹 뿌려줘(utilities)’
 > 라고 부탁하는 코드라고 보면 된다”
 
-라고 말씀하셔도 딱 이해가 될 겁니다. 😄
-
-필요하시면, 이 내용을 강의용 슬라이드 구조로도 다시 정리해 드리겠습니다! 🎓
