@@ -187,15 +187,13 @@ Tailwind 관련 속성만 정렬하고
 
 ---
 
-# 🎓 강의용 포인트 요약
-
-Headwind를 학생들에게 설명할 때 이렇게 말하면 가장 효과적입니다:
+# 🎓 포인트 요약
 
 > “Tailwind는 클래스가 많아서 반드시 자동 정렬이 필요하다.
 > Headwind는 VS Code에서 실시간으로 정렬해주는 도구고,
 > Prettier Tailwind Plugin은 저장소 수준에서 정렬을 강제하는 도구다.”
 
-학생들은 Headwind를 쓰면 Tailwind 클래스가 과감해져서
+Headwind를 쓰면 Tailwind 클래스가 과감해져서
 **코드 리뷰 시 부담이 크게 줄어듭니다.**
 
 ---
