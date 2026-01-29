@@ -336,11 +336,11 @@ DaisyUI는 사실상 **정답**이다. 🌼✨
 
 ---
 
-참고 사항:
+참고 사항: <br>
 
-✅ DaisyUI 전체 컴포넌트 사용 예제(React 버전)
-✅ DaisyUI 테마 토글 예제 (Dark ↔ Light)
-✅ DaisyUI 기반 Vite + React 프로젝트 템플릿 전체 구조
-✅ DaisyUI를 커스터마이징하는 고급 테크닉 소개 블로그
+✅ DaisyUI 전체 컴포넌트 사용 예제(React 버전) <br>
+✅ DaisyUI 테마 토글 예제 (Dark ↔ Light) <br>
+✅ DaisyUI 기반 Vite + React 프로젝트 템플릿 전체 구조 <br>
+✅ DaisyUI를 커스터마이징하는 고급 테크닉 소개 블로그 <br>
 
 
