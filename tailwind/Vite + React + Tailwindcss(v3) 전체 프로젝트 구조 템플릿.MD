@@ -80,7 +80,8 @@ my-app/
 ### 2-2. Tailwind + PostCSS + Autoprefixer 설치
 
 ```bash
-npm i -D tailwindcss@3 postcss autoprefixer
+npm i chance luxon @fontsource/material-icons react-router-dom react-redux @reduxjs/toolkit redux-logger @hello-pangea/dnd react-dnd react-dnd-html5-backend daisyui
+npm i -D tailwindcss@3 postcss autoprefixer @types/chance @types/luxon @types/redux-logger
 npx tailwindcss init -p
 ```
 
