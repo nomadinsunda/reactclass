@@ -1,5 +1,5 @@
 
-```
+```ts
 import React from 'react'
 import {Droppable} from '@hello-pangea/dnd'
 
