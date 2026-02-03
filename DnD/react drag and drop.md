@@ -1,75 +1,73 @@
-# React Drag & Drop 🧲🖱️
+# React Drag & Drop (Native + dnd-kit + @hello-pangea/dnd + react-dnd) 🧲🖱️📦
 
-
-
-React에서 Drag & Drop(DnD)을 한다는 건, 단순히 “마우스로 끌어다 놓기”가 아니라 **사용자 입력(마우스/터치/키보드) → 드래그 상태 관리 → 충돌 판정 → 시각적 피드백 → 데이터 재정렬/이동**을 안정적으로 연결하는 작업입니다. 🧠
-
-아래는 실무에서 가장 많이 쓰는 방식 3가지입니다. ✅
-
-1. **Native HTML5 Drag & Drop API** (가벼움, 하지만 제약 많음) 🧱
-2. **dnd-kit** (현대적/유연/성능 좋음) 🧩⚡
-3. **@hello-pangea/dnd** (react-beautiful-dnd 계열, “칸반 보드”에 특화) 🧰📌
-   (+ **react-dnd**: 복잡한 드롭 규칙/다양한 “드롭 타겟”을 다루는 고전 강자)
+> “드래그 UI”가 아니라 **입력(마우스/터치/키보드) → 충돌 판정 → 시각 피드백 → 상태(데이터) 재배치**를 설계하는 일입니다. 🧠✨
 
 ---
 
-## 1) React에서 DnD의 “본질” 🔥
+## 0) React에서 DnD의 본질 🔥
 
-DnD는 크게 5단계 파이프라인으로 이해하면 깔끔합니다. 🧵
+DnD는 크게 5단계 파이프라인으로 이해하면 “갑자기 쉬워집니다.” 🧵
 
-### (1) 입력 감지 🖱️📱⌨️
+1. **입력 감지** 🖱️📱⌨️
+2. **드래그 상태(무엇을 잡아 들고 있는가 / 어디 위인가)** 🧠
+3. **충돌 판정(어느 droppable 위인가)** 🎯
+4. **시각적 피드백(overlay, placeholder, transform)** 🪄
+5. **데이터 업데이트(배열/정규화 모델 재배치)** 🔁
 
-* Pointer(마우스), Touch(터치), Keyboard(키보드) 등에서 “드래그 시작”을 판단
-* 예: `mousedown` → 일정 거리 이상 이동하면 drag start
-
-### (2) 드래그 상태(Drag State) 저장 🧠
-
-* “지금 뭐를 들고 있는지(active)”
-* “어디 위에 올라가 있는지(over)”
-* “원래 위치/현재 위치”
-
-### (3) 충돌 판정(Collision Detection) 🎯
-
-* 커서/아이템 기준으로 **어떤 droppable 위에 있는지** 계산
-* 예: `closestCenter`, `rectIntersection` 같은 알고리즘
-
-### (4) 시각적 피드백 🪄
-
-* 드래그 중인 아이템을 떠 있는 것처럼 보이게(Transform)
-* 대상 영역 하이라이트
-* placeholder, overlay, z-index, opacity 등
-
-### (5) 데이터 업데이트(진짜 핵심) 🧱➡️🧱
-
-* UI가 아닌 **상태(배열/맵)** 를 이동/재정렬
-* React에선 **불변 업데이트**로 재구성
-
-> 결론: DnD는 “DOM을 옮기는 기술”이 아니라, **상태를 재배치하고 그 결과를 렌더링**하는 패턴입니다. 🔁
+> 핵심: DnD는 DOM을 옮기는 게 아니라, **상태를 바꾸고 React가 다시 그리게 하는 패턴**입니다. ✅
 
 ---
 
-## 2) Native HTML5 Drag & Drop (짧고 간단하지만… 😅)
+## 1) 4가지 접근 방식 한눈에 보기 🧭
+
+### ✅ Native HTML5 DnD
+
+* 의존성 0, 빠르게 가능 🧱
+* 하지만 모바일/정교한 UX/접근성에서 제약이 큼 ⚠️
+
+### ✅ dnd-kit
+
+* 현대적/확장성/성능/접근성 중심 🧩⚡
+* “원하는 UX를 조립”하는 느낌 (센서/충돌판정/전략) ([GitHub][1])
+
+### ✅ @hello-pangea/dnd
+
+* Trello 같은 **칸반 UX에 특화** 🧰📌
+* 드래그 중 placeholder/레이아웃 처리 감각이 좋음
+* npm 기준 주간 다운로드도 매우 큼 ([NPM][2])
+
+### ✅ react-dnd
+
+* “정렬”보다 **드래그 객체 ↔ 드롭 대상 간 규칙 모델링**에 강함 🧲🧱
+* 타입 기반(ITEM TYPE) + drop 규칙 + monitor 관찰
+* 주간 다운로드도 매우 큼 ([NPM][3])
+
+---
+
+## 2) Native HTML5 Drag & Drop (가볍지만 ‘벽’이 있음) 🧱😅
 
 ### 장점 👍
 
-* 라이브러리 없이 즉시 가능
-* 기본 이벤트(`dragstart`, `dragover`, `drop`) 제공
+* 설치 없이 바로 사용 가능
+* 브라우저 기본 이벤트 제공
 
-### 단점 👎 (실무에서 자주 부딪힘)
+### 단점 👎
 
-* **모바일 터치 지원이 애매**하거나 브라우저별 차이 큼 📱
-* 드래그 중 커스텀 UI/정교한 충돌판정이 어렵다
-* 리스트 재정렬 같은 UX는 구현 난이도 상승
+* 모바일 터치 UX가 불안정/브라우저 차이
+* 정교한 충돌 판정/리스트 재정렬 UX는 직접 구현 부담 ↑
+* 접근성(키보드 DnD)까지 고려하면 난이도 상승
 
-### 아주 간단한 예시 🧪
+### 예시: “리스트 재정렬” 최소 구현 🧪
 
 ```jsx
-function NativeDnD() {
-  const [items, setItems] = React.useState(["A", "B", "C"])
+import React from "react"
+
+export default function NativeSortable() {
+  const [items, setItems] = React.useState(["A", "B", "C", "D"])
   const dragIndexRef = React.useRef(null)
 
   return (
-    <ul>
+    <ul style={{ maxWidth: 360, margin: "24px auto", padding: 0 }}>
       {items.map((it, idx) => (
         <li
           key={it}
@@ -79,15 +77,24 @@ function NativeDnD() {
           onDrop={() => {
             const from = dragIndexRef.current
             const to = idx
-            if (from === null || from === to) return
+            if (from == null || from === to) return
 
             const next = [...items]
             const [moved] = next.splice(from, 1)
             next.splice(to, 0, moved)
             setItems(next)
+
             dragIndexRef.current = null
           }}
-          style={{ padding: 12, border: "1px solid #ddd", marginBottom: 8 }}
+          style={{
+            listStyle: "none",
+            padding: 12,
+            border: "1px solid #ddd",
+            borderRadius: 10,
+            marginBottom: 10,
+            background: "white",
+            cursor: "grab",
+          }}
         >
           {it}
         </li>
@@ -97,28 +104,22 @@ function NativeDnD() {
 }
 ```
 
-> “학습용/초간단”으로는 OK ✅
-> “칸반/정교한 UX/모바일/접근성”이면 라이브러리를 추천합니다. 💡
+> 학습/프로토타입에는 충분 ✅
+> 칸반/모바일/접근성/정교한 UX면 라이브러리 쪽이 현실적입니다. 💡
 
 ---
 
-## 3) dnd-kit (요즘 실무에서 가장 ‘엔진다운’ 선택 🧩⚡)
+## 3) dnd-kit (엔진 분해형: 센서 + 충돌판정 + 전략) 🧩⚡
 
-dnd-kit은 React DnD를 **센서(sensor) + 충돌판정 + 정렬전략(strategy)** 으로 분해해 제공합니다.
-즉, “원하는 UX를 조립”하기 좋습니다. 🛠️
+dnd-kit의 방향성은 한 문장으로 이렇습니다:
 
-### 핵심 개념 4개 🧠
+* **센서(Sensors)**: 입력(포인터/터치/키보드)을 분리
+* **Collision detection**: 어떤 대상 위인지 계산
+* **Sortable**: “정렬”을 위한 상위 추상화 제공 ([GitHub][1])
 
-* **DndContext**: DnD의 최상위 컨텍스트 🌍
-* **Sensors**: 마우스/터치/키보드 입력을 감지 🎛️
-* **Droppable / Draggable**: 드롭 영역/드래그 대상 🧲
-* **Sortable**: “리스트 재정렬”을 위한 상위 추상화 📦↕️
+또한 `@dnd-kit/core` 최신 버전 정보는 npm에 공개되어 있고(예: 6.3.1) ([NPM][4]), 실무에서 널리 사용됩니다.
 
----
-
-### ✅ dnd-kit Sortable 예시 (실무형: 드래그 핸들 + 오버레이 + 재정렬) 🧷✨
-
-> 아래 예시는 “카드 리스트 정렬”을 꽤 실전처럼 구성했습니다.
+### 예시: Sortable + DragOverlay + DragHandle (실무형) 🧷✨
 
 ```jsx
 import React from "react"
@@ -129,6 +130,7 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  DragOverlay,
 } from "@dnd-kit/core"
 import {
   SortableContext,
@@ -138,29 +140,22 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { DragOverlay } from "@dnd-kit/core"
 
 function SortableItem({ id, title }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id })
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } =
+    useSortable({ id })
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : 1,
+    opacity: isDragging ? 0.25 : 1,
     border: "1px solid #ddd",
+    borderRadius: 12,
     padding: 12,
-    borderRadius: 10,
     background: "white",
     display: "flex",
-    gap: 10,
     alignItems: "center",
+    gap: 10,
   }
 
   return (
@@ -171,25 +166,24 @@ function SortableItem({ id, title }) {
         {...attributes}
         style={{
           cursor: "grab",
-          padding: "6px 10px",
-          borderRadius: 8,
           border: "1px solid #ccc",
+          borderRadius: 10,
+          padding: "6px 10px",
           background: "#f7f7f7",
         }}
         aria-label="drag handle"
       >
         ⠿
       </button>
-
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 700 }}>{title}</div>
+        <div style={{ fontWeight: 800 }}>{title}</div>
         <div style={{ fontSize: 12, color: "#666" }}>id: {id}</div>
       </div>
     </div>
   )
 }
 
-export default function DndKitSortableDemo() {
+export default function DndKitSortable() {
   const [items, setItems] = React.useState([
     { id: "c1", title: "카드 1" },
     { id: "c2", title: "카드 2" },
@@ -198,52 +192,34 @@ export default function DndKitSortableDemo() {
   ])
 
   const [activeId, setActiveId] = React.useState(null)
+  const ids = items.map((x) => x.id)
+  const activeItem = items.find((x) => x.id === activeId)
 
-  // ✅ Sensors: 포인터 + 키보드
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 }, // 실수 클릭 방지 🧯
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }), // 클릭-드래그 오작동 방지 🧯
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
-
-  const ids = items.map((it) => it.id)
-  const activeItem = items.find((it) => it.id === activeId)
-
-  function handleDragStart(event) {
-    setActiveId(event.active.id)
-  }
-
-  function handleDragEnd(event) {
-    const { active, over } = event
-    setActiveId(null)
-
-    if (!over) return
-    if (active.id === over.id) return
-
-    const oldIndex = ids.indexOf(active.id)
-    const newIndex = ids.indexOf(over.id)
-    setItems((prev) => arrayMove(prev, oldIndex, newIndex))
-  }
-
-  function handleDragCancel() {
-    setActiveId(null)
-  }
 
   return (
     <div style={{ maxWidth: 420, margin: "40px auto" }}>
-      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>
-        dnd-kit Sortable 리스트 🧩
+      <h2 style={{ fontSize: 20, fontWeight: 900, marginBottom: 12 }}>
+        dnd-kit Sortable 🧩
       </h2>
 
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
+        onDragStart={(e) => setActiveId(e.active.id)}
+        onDragCancel={() => setActiveId(null)}
+        onDragEnd={(e) => {
+          const { active, over } = e
+          setActiveId(null)
+          if (!over || active.id === over.id) return
+
+          const oldIndex = ids.indexOf(active.id)
+          const newIndex = ids.indexOf(over.id)
+          setItems((prev) => arrayMove(prev, oldIndex, newIndex))
+        }}
       >
         <SortableContext items={ids} strategy={verticalListSortingStrategy}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -253,23 +229,21 @@ export default function DndKitSortableDemo() {
           </div>
         </SortableContext>
 
-        {/* ✅ DragOverlay: 드래그 중 “떠있는 카드” */}
+        {/* ✅ DragOverlay: “떠 있는 카드” */}
         <DragOverlay>
           {activeItem ? (
             <div
               style={{
+                width: 380,
                 border: "1px solid #bbb",
+                borderRadius: 12,
                 padding: 12,
-                borderRadius: 10,
                 background: "white",
                 boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-                width: 380,
               }}
             >
-              <div style={{ fontWeight: 800 }}>{activeItem.title}</div>
-              <div style={{ fontSize: 12, color: "#666" }}>
-                드래그 중… ✨
-              </div>
+              <div style={{ fontWeight: 900 }}>{activeItem.title}</div>
+              <div style={{ fontSize: 12, color: "#666" }}>드래그 중… ✨</div>
             </div>
           ) : null}
         </DragOverlay>
@@ -279,87 +253,356 @@ export default function DndKitSortableDemo() {
 }
 ```
 
-#### 이 코드가 “실무 감성”인 포인트 🧠✨
+**dnd-kit이 특히 좋은 경우** ✅
 
-* **activationConstraint(distance: 8)** → 클릭과 드래그를 구분 (실수 방지) 🧯
-* **DragOverlay** → 드래그 시 시각적 퀄리티 상승 🎨
-* **KeyboardSensor** → 접근성(키보드 DnD)까지 고려 ⌨️
-* 상태 업데이트는 `arrayMove`로 **불변 재정렬** 🔁
+* “칸반도 하되” 커스텀 UX가 많다
+* 키보드/센서/충돌판정/전략을 튜닝해야 한다
+* 성능/확장성을 길게 보고 간다
 
 ---
 
-## 4) @hello-pangea/dnd (칸반 보드에 특화 📌🧰)
+## 4) @hello-pangea/dnd (칸반 UX 특화: provided/snapshot) 🧰📌
 
-이 계열은 “Trello 같은 칸반”을 만들 때 UX가 이미 잘 잡혀 있습니다.
-**Droppable / Draggable + provided / snapshot** 패턴이 특징이에요. 🧱
+@hello-pangea/dnd는 react-beautiful-dnd 계열의 “칸반 감성”을 유지한 라이브러리입니다.
+npm 기준 버전/주간 다운로드도 매우 활발한 편입니다. ([NPM][2])
+
+### provided / snapshot의 의미가 핵심 🧠
+
+* **provided**: “DOM에 DnD 기능을 연결하는 케이블” 🔌
+
+  * `provided.innerRef`, `provided.droppableProps`, `provided.draggableProps`, `provided.dragHandleProps`
+* **snapshot**: “현재 드래그 상태 텔레메트리(실시간 UI 반응)” 👀
+
+  * `snapshot.isDragging`, `snapshot.isDraggingOver` 등
+
+### 예시: (미니) 칸반 스타일로 리스트/카드 드래그 📌
+
+```jsx
+import React from "react"
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
+
+const initial = {
+  todo: [{ id: "c1", title: "할 일 1" }, { id: "c2", title: "할 일 2" }],
+  doing: [{ id: "c3", title: "진행 1" }],
+}
+
+function moveBetweenColumns(state, source, destination) {
+  const src = Array.from(state[source.droppableId])
+  const dst = Array.from(state[destination.droppableId])
+  const [moved] = src.splice(source.index, 1)
+  dst.splice(destination.index, 0, moved)
+
+  return {
+    ...state,
+    [source.droppableId]: src,
+    [destination.droppableId]: dst,
+  }
+}
+
+export default function PangeaMiniKanban() {
+  const [cols, setCols] = React.useState(initial)
+
+  return (
+    <div style={{ display: "flex", gap: 12, padding: 24 }}>
+      <DragDropContext
+        onDragEnd={(result) => {
+          const { source, destination } = result
+          if (!destination) return
+
+          // 같은 컬럼 내 reorder
+          if (source.droppableId === destination.droppableId) {
+            const next = Array.from(cols[source.droppableId])
+            const [moved] = next.splice(source.index, 1)
+            next.splice(destination.index, 0, moved)
+            setCols((prev) => ({ ...prev, [source.droppableId]: next }))
+            return
+          }
+
+          // 컬럼 간 이동
+          setCols((prev) => moveBetweenColumns(prev, source, destination))
+        }}
+      >
+        {Object.entries(cols).map(([colId, cards]) => (
+          <Droppable key={colId} droppableId={colId}>
+            {(provided, snapshot) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                style={{
+                  width: 260,
+                  padding: 12,
+                  borderRadius: 14,
+                  background: snapshot.isDraggingOver ? "#e0f2fe" : "#f1f5f9",
+                }}
+              >
+                <h3 style={{ fontWeight: 900, marginBottom: 10 }}>{colId}</h3>
+
+                {cards.map((card, index) => (
+                  <Draggable key={card.id} draggableId={card.id} index={index}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                        style={{
+                          ...provided.draggableProps.style,
+                          padding: 12,
+                          borderRadius: 12,
+                          border: "1px solid #ddd",
+                          background: "white",
+                          marginBottom: 10,
+                          opacity: snapshot.isDragging ? 0.6 : 1,
+                        }}
+                      >
+                        {card.title}
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+
+                {/* ✅ placeholder: 드래그 중 레이아웃 안정화 */}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        ))}
+      </DragDropContext>
+    </div>
+  )
+}
+```
+
+**@hello-pangea/dnd가 특히 좋은 경우** ✅
+
+* Trello 같은 “칸반 UX”를 빠르게 안정적으로
+* placeholder/레이아웃 안정화가 중요
+* 정형화된 UX에 맞추는 게 편하다
+
+---
+
+## 5) react-dnd (정렬보다 “규칙/타입/상호작용” 엔진) 🧲🧱
+
+react-dnd는 관점이 완전히 다릅니다.
+
+* dnd-kit / pangea: “정렬/칸반 UX”에 초점
+* **react-dnd**: “드래그 아이템(데이터 객체) ↔ 드롭 타겟(규칙)”의 상호작용에 초점
+
+npm 기준으로도 널리 사용되며(주간 다운로드/버전 정보) ([NPM][3]),
+“대시보드 위젯 배치, 폼 빌더, 에디터” 같은 **도메인 규칙이 강한 DnD**에서 빛납니다. 🔥
 
 ### 핵심 개념 🧠
 
-* `DragDropContext`: 전체 컨텍스트
-* `Droppable`: 드롭 가능한 영역(리스트)
-* `Draggable`: 드래그 가능한 카드
-* `provided`: ref/props 묶음(라이브러리 연결용) 🔌
-* `snapshot`: 현재 상태(드래그 중인지, 위에 올라갔는지) 👀
+* **DndProvider + Backend**: HTML5Backend 등
+* **Drag Item**: “드래그하는 데이터 객체” 📦
+* **useDrag**: 이 컴포넌트는 드래그 가능 🖱️
+* **useDrop**: 이 컴포넌트는 드롭 가능 🎯
+* **monitor**: 현재 드래그 상태 관찰(수집/조건/효과) 👀
 
-### “provided / snapshot”이 왜 중요하냐면요? 🔍
+### 예시: “CARD 타입만 받고, 조건(canDrop)으로 거르기” 🎯
 
-* **provided**는 “이 DOM에 드래그 기능을 붙이기 위한 연결 케이블”입니다.
+```jsx
+import React from "react"
+import { DndProvider, useDrag, useDrop } from "react-dnd"
+import { HTML5Backend } from "react-dnd-html5-backend"
 
-  * `provided.innerRef` → DOM 참조 연결
-  * `provided.draggableProps` / `provided.dragHandleProps` → 이벤트/속성 연결
-* **snapshot**은 “현재 드래그 상황을 알려주는 실시간 텔레메트리”입니다.
+const ItemTypes = { CARD: "CARD" }
 
-  * `snapshot.isDragging` / `snapshot.isDraggingOver` 등을 활용해 스타일 변경
+function Card({ id, title, listId }) {
+  const [{ isDragging }, dragRef] = useDrag(() => ({
+    type: ItemTypes.CARD,
+    item: { id, listId },
+    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+  }))
 
-> 즉, `provided`는 **동작 연결**, `snapshot`은 **상태 기반 UI 반응** 🎛️🎨
+  return (
+    <div
+      ref={dragRef}
+      style={{
+        padding: 12,
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        background: "white",
+        marginBottom: 10,
+        opacity: isDragging ? 0.4 : 1,
+        cursor: "grab",
+      }}
+    >
+      {title}
+    </div>
+  )
+}
+
+function List({ id, title, onMoveCard }) {
+  const [{ isOver, canDrop }, dropRef] = useDrop(() => ({
+    accept: ItemTypes.CARD,
+    canDrop: (item) => item.listId !== id, // ✅ 같은 리스트로는 drop 금지
+    drop: (item) => onMoveCard(item.id, item.listId, id),
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+      canDrop: monitor.canDrop(),
+    }),
+  }))
+
+  return (
+    <div
+      ref={dropRef}
+      style={{
+        width: 280,
+        padding: 12,
+        borderRadius: 14,
+        background: isOver && canDrop ? "#dcfce7" : "#f1f5f9",
+      }}
+    >
+      <h3 style={{ fontWeight: 900, marginBottom: 10 }}>{title}</h3>
+      <div style={{ fontSize: 12, color: "#64748b" }}>
+        {canDrop ? "여기로 드롭 가능 ✅" : "드롭 불가 ❌"}
+      </div>
+    </div>
+  )
+}
+
+export default function ReactDndMini() {
+  const [state, setState] = React.useState({
+    L1: [{ id: "c1", title: "카드 1" }, { id: "c2", title: "카드 2" }],
+    L2: [{ id: "c3", title: "카드 3" }],
+  })
+
+  function onMoveCard(cardId, fromListId, toListId) {
+    if (fromListId === toListId) return
+
+    setState((prev) => {
+      const from = [...prev[fromListId]]
+      const to = [...prev[toListId]]
+      const idx = from.findIndex((c) => c.id === cardId)
+      const [moved] = from.splice(idx, 1)
+      to.unshift(moved) // 예: 대상 리스트 맨 위로 📌
+      return { ...prev, [fromListId]: from, [toListId]: to }
+    })
+  }
+
+  return (
+    <DndProvider backend={HTML5Backend}>
+      <div style={{ display: "flex", gap: 12, padding: 24 }}>
+        <div style={{ width: 280 }}>
+          <List id="L1" title="List 1" onMoveCard={onMoveCard} />
+          <div style={{ marginTop: 10 }}>
+            {state.L1.map((c) => (
+              <Card key={c.id} id={c.id} title={c.title} listId="L1" />
+            ))}
+          </div>
+        </div>
+
+        <div style={{ width: 280 }}>
+          <List id="L2" title="List 2" onMoveCard={onMoveCard} />
+          <div style={{ marginTop: 10 }}>
+            {state.L2.map((c) => (
+              <Card key={c.id} id={c.id} title={c.title} listId="L2" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </DndProvider>
+  )
+}
+```
+
+**react-dnd가 특히 좋은 경우** ✅
+
+* 드래그 타입이 여러 개(CARD, COLUMN, WIDGET…)
+* “A는 B에만 drop 가능” 같은 규칙이 많다
+* 대시보드/에디터/빌더처럼 “정렬”보다 “상호작용 모델링”이 핵심
 
 ---
 
-## 5) 성능 & 구조 설계 팁 (실무에서 진짜 갈리는 부분 ⚡🧱)
+## 6) 실무에서 제일 중요한 “상태 설계” 팁 🧠🧱
 
-### ✅ 상태 구조는 이렇게 잡으면 편합니다 🧠
+칸반/보드 구조에서는 **정규화(normalized)** 가 DnD의 난이도를 확 줄입니다.
+> 정규화 상태란,
+> “중첩된 UI 구조를 그대로 저장하지 않고,
+> 엔티티를 ID 기준으로 분리하고
+> ‘관계’만 배열로 관리하는 방식” 입니다.
 
-칸반이라면 보통:
+### ❌ 비정규화된 상태 (DnD 지옥문 😵‍💫)
+```
+const board = {
+  id: 'board-1',
+  lists: [
+    {
+      id: 'list-1',
+      title: 'Todo',
+      cards: [
+        { id: 'c1', title: '할 일 1' },
+        { id: 'c2', title: '할 일 2' },
+      ],
+    },
+    {
+      id: 'list-2',
+      title: 'Doing',
+      cards: [
+        { id: 'c3', title: '진행 1' },
+      ],
+    },
+  ],
+}
+```
+
+### ✅ 정규화된 상태 (DnD가 쉬워지는 구조 😌)
+```
+const state = {
+  listsById: {
+    'list-1': {
+      id: 'list-1',
+      title: 'Todo',
+      cardIds: ['c1', 'c2'],
+    },
+    'list-2': {
+      id: 'list-2',
+      title: 'Doing',
+      cardIds: ['c3'],
+    },
+  },
+
+  cardsById: {
+    c1: { id: 'c1', title: '할 일 1' },
+    c2: { id: 'c2', title: '할 일 2' },
+    c3: { id: 'c3', title: '진행 1' },
+  },
+
+  listOrder: ['list-1', 'list-2'],
+}
+
+```
+
+---
+
+✅ 추천 형태
 
 * `listsById: { [listId]: { id, title, cardIds: [] } }`
 * `cardsById: { [cardId]: { id, title, ... } }`
 
-즉 **정규화(normalized)** 구조가 DnD에 강합니다. 💪
-왜냐하면 “재정렬”은 결국 `cardIds` 배열만 바꾸면 되니까요. 🔁
+👉 카드 이동/정렬은 결국 `cardIds` 배열만 바꾸면 끝이라서,
+UI가 커져도 제어가 쉬워집니다. 🔁
 
 ---
 
-### ✅ 리렌더 최소화 팁 🧊
+## 7) 성능 & UX 체크리스트 ⚡✅
 
-* 드래그 중에는 state를 과도하게 바꾸지 말기 (특히 `onDragMove`) 🚫
-* 카드 컴포넌트는 `React.memo` + 안정적인 props 유지 🧷
-* 큰 리스트면 **가상화(virtualization)** 고려 📦 (단, DnD와 결합 난이도 있음)
-
----
-
-### ✅ 접근성(A11y)은 선택이 아니라 기본입니다 ♿✨
-
-* 키보드로도 이동 가능해야 함 (`KeyboardSensor` 같은 것)
-* 포커스 관리(드래그 시작/종료 후 어디에 포커스를 둘지)
-* 스크린리더 안내(“이동됨”, “몇 번째 위치” 등)
+* 드래그 중에 `onDragMove`로 state를 계속 바꾸지 마세요 (프레임 드랍 💥)
+* `React.memo` + 안정적인 props로 카드 리렌더 최소화 🧊
+* 드래그 핸들(⠿)을 분리하면 클릭/스크롤 UX가 좋아짐 🧷
+* 모바일이면 “드래그 시작 거리(distance)” 같은 제약으로 오작동 방지 🧯
+* 접근성: 키보드 센서/포커스/스크린리더 메시지 고려 ♿⌨️
 
 ---
 
-## 6) 라이브러리 선택 가이드 🧭
+## 8) 그래서 뭘 쓰면 되나요? 최종 선택 가이드 🧭✨
 
-### dnd-kit 추천 ✅
+* **리스트 재정렬/커스텀 UX/성능/확장성** → **dnd-kit** 🧩⚡ ([GitHub][1])
+* **칸반(Trello) UX를 빠르게/안정적으로** → **@hello-pangea/dnd** 🧰📌 ([NPM][2])
+* **타입/규칙/상호작용(에디터/빌더/위젯 배치)** → **react-dnd** 🧲🧱 ([NPM][3])
+* **아주 단순한 드롭/학습용** → Native 🧱
 
-* 커스텀 UX/정교한 충돌판정/성능/확장성 중요 🧩⚡
-* “내 앱에 맞는 드래그 경험”을 만들고 싶다
-
-### @hello-pangea/dnd 추천 ✅
-
-* “칸반 보드 중심”이고, 정형화된 UX가 편하다 📌
-* provided/snapshot 패턴이 맞는다
-
-### Native 추천 ✅
-
-* 아주 단순한 드롭(파일 업로드 영역 같은) 📤
-* 학습/프로토타입/의존성 최소
-
-
+[1]: https://github.com/clauderic/dnd-kit?utm_source=chatgpt.com "clauderic/dnd-kit"
+[2]: https://www.npmjs.com/package/%40hello-pangea/dnd?utm_source=chatgpt.com "hello-pangea/dnd"
+[3]: https://www.npmjs.com/package/react-dnd?activeTab=dependents&utm_source=chatgpt.com "react-dnd"
+[4]: https://www.npmjs.com/package/%40dnd-kit/core?activeTab=dependents&utm_source=chatgpt.com "dnd-kit/core"
