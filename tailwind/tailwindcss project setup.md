@@ -18,7 +18,7 @@ npm create vite@latest firsttailwindcssv4app
 # 2. 프로젝트 폴더로 이동
 cd firsttailwindcssv4app
 
-# 3. 기본 패키지 설치
+# 3. 디폴트 패키지 설치
 npm install
 ```
 
@@ -55,7 +55,7 @@ export default defineConfig({
 ---
 
 ## 4️⃣ CSS 엔트리 파일 작성 (`src/index.css`)
-Vite가 기본으로 만들어준 `src/index.css` 파일의 내용을 **모두 지우고** 아래의 코드만 딱 입력하세요.
+Vite가 디폴트로 만들어준 `src/index.css` 파일의 내용을 **모두 지우고** 아래의 코드만 딱 입력하세요.
 
 ```css
 /* src/index.css */
@@ -92,6 +92,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 ## 6️⃣ src/App.css 내용 삭제
 vite가 생성한 App.css 파일의 내용을 모두 삭제합니다
+
 ---
 
 ## 7️⃣ 클래스 사용 및 테스트 (`src/App.jsx`)
@@ -122,7 +123,7 @@ export default App
 
 ---
 
-## ✅ 마지막 체크리스트 (v4 핵심 요약)
+## ✅ 마지막 체크리스트
 
 * **파일 삭제:** 프로젝트 루트에 `tailwind.config.js`나 `postcss.config.js`가 없어도 정상입니다. (안심하세요! 😊)
 * **자동 감지:** HTML, JS, JSX 등 어떤 파일이든 클래스를 쓰면 Tailwind가 알아서 찾아냅니다.
