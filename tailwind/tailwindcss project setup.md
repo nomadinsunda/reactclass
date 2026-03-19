@@ -13,7 +13,7 @@
 
 ```bash
 # 1. 프로젝트 생성 (JavaScript 선택)
-npm create vite@latest my-tailwind-app -- --template react
+npm create vite@latest my-tailwind-app
 
 # 2. 프로젝트 폴더로 이동
 cd my-tailwind-app
