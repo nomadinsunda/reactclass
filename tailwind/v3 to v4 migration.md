@@ -1,9 +1,3 @@
-
-```
-npx @tailwindcss/upgrade@latest
-```
-
-
 ```
 $ npx @tailwindcss/upgrade@latest
 Need to install the following packages:
