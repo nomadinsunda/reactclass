@@ -69,7 +69,7 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [
     react(),
-    tailwindcss(), // ← Tailwind v4 공식 플러그인
+    tailwindcss() // ← Tailwind v4 공식 플러그인
   ],
 })
 ```
