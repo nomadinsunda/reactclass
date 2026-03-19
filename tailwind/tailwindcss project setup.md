@@ -13,10 +13,10 @@
 
 ```bash
 # 1. 프로젝트 생성 (JavaScript 선택)
-npm create vite@latest my-tailwind-app
+npm create vite@latest firsttailwindcssv4app
 
 # 2. 프로젝트 폴더로 이동
-cd my-tailwind-app
+cd firsttailwindcssv4app
 
 # 3. 기본 패키지 설치
 npm install
@@ -90,7 +90,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 ---
 
-## 6️⃣ 클래스 사용 및 테스트 (`src/App.jsx`)
+## 6️⃣ src/App.css 내용 삭제
+vite가 생성한 App.css 파일의 내용을 모두 삭제합니다
+---
+
+## 7️⃣ 클래스 사용 및 테스트 (`src/App.jsx`)
 이제 모든 준비가 끝났습니다. `App.jsx`에서 Tailwind 클래스가 잘 작동하는지 테스트해 보세요.
 
 ```javascript
