@@ -1,0 +1,296 @@
+# 🚀 [Tailwind CSS v4.0](https://tailwindcss.com/blog/tailwindcss-v4)
+
+이게 진짜로 끝났습니다 — 우리는 방금 Tailwind CSS v4.0 태그를 달았습니다.
+
+Tailwind CSS v4.0은 성능과 유연성을 위해 최적화된 완전히 새로운 버전으로, 설정과 커스터마이징 경험을 다시 설계했으며, 웹 플랫폼의 최신 발전을 최대한 활용합니다.
+
+---
+
+* 새로운 고성능 엔진 — 전체 빌드는 최대 5배 더 빠르고, 증분 빌드는 100배 이상 더 빠르며, 마이크로초 단위로 측정됩니다.
+* 현대 웹을 위한 설계 — cascade layers, `@property`로 등록된 커스텀 속성, `color-mix()` 같은 최신 CSS 기능을 기반으로 구축되었습니다.
+* 단순화된 설치 — 더 적은 의존성, 설정 없이 사용 가능, CSS 파일에 단 한 줄만 추가하면 됩니다.
+* 공식 Vite 플러그인 — 최고의 성능과 최소 설정을 위한 긴밀한 통합을 제공합니다.
+* 자동 콘텐츠 감지 — 모든 템플릿 파일을 자동으로 탐색하며, 별도의 설정이 필요 없습니다.
+* 내장 import 지원 — 여러 CSS 파일을 번들링하기 위해 추가 도구가 필요 없습니다.
+* CSS 중심 설정 — JavaScript 설정 파일 대신 CSS에서 직접 프레임워크를 커스터마이징하고 확장할 수 있는 새로운 개발 경험을 제공합니다.
+* CSS 테마 변수 — 모든 디자인 토큰을 네이티브 CSS 변수로 제공하여 어디서든 사용할 수 있습니다.
+* 동적 유틸리티 값 및 변형 — spacing 값이 무엇인지 추측하거나 기본적인 데이터 속성을 위해 설정을 확장할 필요가 없습니다.
+* 현대화된 P3 색상 팔레트 — 최신 디스플레이 기술을 최대한 활용한 더 생생한 색상 팔레트입니다.
+* 컨테이너 쿼리 — 플러그인 없이도 컨테이너 크기에 따라 스타일링할 수 있는 API를 제공합니다.
+* 새로운 3D transform 유틸리티 — HTML에서 직접 요소를 3D 공간에서 변형할 수 있습니다.
+* 확장된 그라디언트 API — radial 및 conic 그라디언트, 보간 모드 등 다양한 기능을 제공합니다.
+* @starting-style 지원 — JavaScript 없이도 진입/이탈 트랜지션을 만들 수 있는 새로운 변형입니다.
+* not-* 변형 — 다른 변형, 사용자 정의 선택자, 미디어 쿼리 또는 기능 쿼리에 일치하지 않을 때만 스타일을 적용할 수 있습니다.
+* 더 많은 유틸리티와 변형 — color-scheme, field-sizing, 복잡한 shadow, inert 등 다양한 기능이 추가되었습니다.
+
+지금 바로 새 프로젝트에 Tailwind CSS v4.0을 설치하거나, Tailwind Play에서 브라우저로 직접 사용해보세요.
+
+기존 프로젝트를 위해서는, 최신 버전으로 빠르고 쉽게 업그레이드할 수 있도록 포괄적인 업그레이드 가이드와 자동 업그레이드 도구를 제공하고 있습니다.
+
+---
+
+# ⚡ 새로운 고성능 엔진
+
+Tailwind CSS v4.0은 프레임워크를 완전히 새롭게 다시 작성한 버전으로, 수년간의 아키텍처 경험을 바탕으로 가능한 한 빠르게 최적화되었습니다.
+
+자체 프로젝트에서 벤치마크를 수행한 결과:
+
+* 전체 리빌드: 3.5배 이상 빠름
+* 증분 빌드: 8배 이상 빠름
+
+---
+
+## 📊 벤치마크 결과
+
+| 항목               | v3.4  | v4.0  | 개선    |
+| ---------------- | ----- | ----- | ----- |
+| 전체 빌드            | 378ms | 100ms | 3.78배 |
+| 새로운 CSS 포함 증분 빌드 | 44ms  | 5ms   | 8.8배  |
+| 새로운 CSS 없음 증분 빌드 | 35ms  | 192µs | 182배  |
+
+가장 인상적인 개선은 실제로 새로운 CSS를 컴파일할 필요가 없는 증분 빌드에서 나타납니다 — 이러한 빌드는 100배 이상 빠르며 마이크로초 단위로 완료됩니다.
+
+그리고 프로젝트를 오래 작업할수록 이런 상황이 더 자주 발생합니다. 왜냐하면 이미 사용했던 클래스들(`flex`, `col-span-2`, `font-bold` 등)을 계속 재사용하게 되기 때문입니다.
+
+---
+
+# 🌍 현대 웹을 위한 설계
+
+Tailwind CSS v3.0을 출시한 이후 웹 플랫폼은 크게 발전했으며, v4.0은 이러한 발전을 최대한 활용합니다.
+
+```css
+@layer theme, base, components, utilities;
+@layer utilities {
+  .mx-6 {
+    margin-inline: calc(var(--spacing) * 6);
+  }
+  .bg-blue-500\/50 {
+    background-color: color-mix(in oklab, var(--color-blue-500) 50%, transparent);
+  }
+}
+@property --tw-gradient-from {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #0000;
+}
+```
+
+우리는 다음과 같은 최신 CSS 기능들을 활용합니다:
+
+* 네이티브 cascade layers — 서로 다른 스타일 규칙 간의 상호작용을 더욱 정밀하게 제어
+* 등록된 커스텀 속성 — 그라디언트 애니메이션 같은 작업을 가능하게 하고, 대규모 페이지에서 성능을 향상
+* `color-mix()` — CSS 변수나 currentColor를 포함한 모든 색상 값을 조합하여 불투명도를 조절 가능
+* logical properties — RTL 지원을 단순화하고 생성되는 CSS 크기를 줄임
+
+이러한 기능 덕분에 내부 구조도 단순해졌으며, 버그 발생 가능성을 줄이고 유지보수가 쉬워졌습니다.
+
+---
+
+# ⚙️ 단순화된 설치
+
+v4.0에서는 설정 과정을 크게 간소화했습니다.
+
+### 1. Tailwind 설치
+
+```bash
+npm i tailwindcss @tailwindcss/postcss;
+```
+
+### 2. PostCSS 플러그인 추가
+
+```js
+export default {
+  plugins: ["@tailwindcss/postcss"],
+};
+```
+
+### 3. CSS에서 import
+
+```css
+@import "tailwindcss";
+```
+
+---
+
+이제 Tailwind는 그 어느 때보다 가볍게 느껴집니다:
+
+* CSS 한 줄만 추가 — 더 이상 `@tailwind` 디렉티브 필요 없음
+* 설정 없음 — 템플릿 경로 설정조차 필요 없음
+* 외부 플러그인 필요 없음 — import 처리와 vendor prefix는 내부적으로 Lightning CSS가 처리
+
+---
+
+# ⚡ 공식 Vite 플러그인
+
+Vite 사용자라면 이제 PostCSS 대신 `@tailwindcss/vite`를 사용할 수 있습니다:
+
+```js
+import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
+
+export default defineConfig({
+  plugins: [tailwindcss()],
+});
+```
+
+PostCSS 플러그인으로도 매우 빠르지만, Vite 플러그인을 사용하면 더 높은 성능을 얻을 수 있습니다.
+
+---
+
+# 🔍 자동 콘텐츠 감지
+
+v3에서 항상 설정해야 했던 `content` 배열을 기억하시나요?
+
+v4에서는 다양한 휴리스틱을 사용하여 이를 자동으로 감지합니다.
+
+예를 들어 `.gitignore`에 포함된 파일은 자동으로 제외됩니다:
+
+```
+/node_modules
+/coverage
+/.next/
+/build
+```
+
+또한 이미지, 영상, zip 파일 등 모든 바이너리 파일도 자동으로 제외됩니다.
+
+필요한 경우 `@source` 디렉티브로 명시적으로 추가할 수 있습니다:
+
+```css
+@import "tailwindcss";
+@source "../node_modules/@my-company/ui-lib";
+```
+
+---
+
+# 📦 내장 import 지원
+
+이전에는 `postcss-import` 같은 플러그인이 필요했습니다.
+
+이제는 Tailwind가 자체적으로 처리하므로 추가 도구가 필요 없습니다.
+
+---
+
+# 🎨 CSS 중심 설정
+
+v4.0의 가장 큰 변화 중 하나는 JavaScript 대신 CSS에서 설정하는 방식입니다.
+
+```css
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Satoshi", "sans-serif";
+  --breakpoint-3xl: 1920px;
+  --color-avocado-100: oklch(0.99 0 0);
+  --color-avocado-200: oklch(0.98 0.04 113.22);
+  --color-avocado-300: oklch(0.94 0.11 115.03);
+  --color-avocado-400: oklch(0.92 0.19 114.08);
+  --color-avocado-500: oklch(0.84 0.18 117.33);
+  --color-avocado-600: oklch(0.53 0.12 118.34);
+  --ease-fluid: cubic-bezier(0.3, 0, 0, 1);
+  --ease-snappy: cubic-bezier(0.2, 0, 0, 1);
+}
+```
+
+이 방식으로 디자인 토큰 설정, 커스텀 유틸리티 및 변형 정의 등을 모두 수행할 수 있습니다.
+
+---
+
+# 🧬 CSS 테마 변수
+
+모든 디자인 토큰이 CSS 변수로 제공됩니다:
+
+```css
+:root {
+  --font-display: "Satoshi", "sans-serif";
+  --breakpoint-3xl: 1920px;
+  --color-avocado-500: oklch(0.84 0.18 117.33);
+}
+```
+
+이를 통해 런타임에서도 쉽게 재사용하거나 애니메이션에 활용할 수 있습니다.
+
+---
+
+# 🔄 동적 유틸리티 값
+
+이제 별도 설정 없이 다양한 값을 사용할 수 있습니다:
+
+```html
+<div class="grid grid-cols-15"></div>
+<div data-current class="opacity-75 data-current:opacity-100"></div>
+```
+
+spacing 유틸리티도 하나의 변수로부터 동적으로 생성됩니다.
+
+---
+
+# 🎨 현대화된 색상 팔레트
+
+RGB 대신 OKLCH를 사용하여 더 넓은 색상 범위를 활용합니다.
+
+기존 색상 균형은 유지하면서도 더 생생한 색상을 제공합니다.
+
+---
+
+# 🧊 컨테이너 쿼리
+
+이제 기본 지원됩니다:
+
+```html
+<div class="@container">
+  <div class="grid grid-cols-1 @sm:grid-cols-3 @lg:grid-cols-4"></div>
+</div>
+```
+
+---
+
+# 🎮 3D transform
+
+```html
+<div class="rotate-x-51 rotate-z-43 transform-3d"></div>
+```
+
+---
+
+# 🌈 그라디언트 확장
+
+* linear gradient 각도 지원
+* interpolation 모드 지원
+* conic / radial gradient 추가
+
+---
+
+# 🎬 @starting-style 지원
+
+JavaScript 없이 등장 애니메이션 가능
+
+---
+
+# 🚫 not-* 변형
+
+`:not()`을 기반으로 스타일 적용 가능
+
+---
+
+# ➕ 기타 추가 기능
+
+* inset shadow
+* field sizing
+* color scheme
+* font stretch
+* inert
+* nth-*
+* descendant variant 등
+
+---
+
+# 🎉 마무리
+
+여기까지가 Tailwind CSS v4.0입니다.
+
+이 버전을 만들기까지 수년이 걸렸고, 우리는 매우 자랑스럽습니다.
+
+직접 사용해보고, 실험해보고, 심지어 망가뜨려도 좋습니다. 그리고 반드시 의견을 알려주세요.
+
+단, 버그 리포트는 내일부터 부탁드립니다 — 오늘은 팀 저녁 식사와 호텔 온수 욕조에서 잠시 완벽한 소프트웨어를 출시했다고 믿으며 즐기고 싶습니다 😄
