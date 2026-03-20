@@ -45,7 +45,7 @@ Ok to proceed? (y) y
 │ Verify the changes and commit them to your repository.
 ```
 
-# 🛠️ Tailwind CSS 4.0 업그레이드 로그 완벽 분석: 내 프로젝트에 일어난 변화
+# 🛠️ Tailwind CSS 4.0 업그레이드 로그 분석: 내 프로젝트에 일어난 변화
 
 최근 Tailwind CSS 4.0(현재 로그상 4.2.2)이 출시되면서 기존 v3 프로젝트를 마이그레이션하는 분들이 많아졌습니다. `npx @tailwindcss/upgrade` 명령어를 실행했을 때, 터미널은 우리에게 어떤 메시지를 던졌을까요? 
 
@@ -57,7 +57,7 @@ Ok to proceed? (y) y
 > `Searching for CSS files...`
 > `↳ Linked .\tailwind.config.js to .\src\index.css`
 
-v4의 핵심 철학은 **"CSS-First"**입니다. 
+v4의 핵심 철학은 **"CSS-First"** 입니다. 
 기존에는 `tailwind.config.js`가 프로젝트의 중심이었지만, v4에서는 CSS 파일이 중심이 됩니다. 업그레이드 도구는 프로젝트를 뒤져서 메인 CSS 파일(`src/index.css`)을 찾아냈고, 기존의 자바스크립트 설정 파일과 연결하는 작업을 우선적으로 수행했습니다.
 
 ---
@@ -80,7 +80,7 @@ v4의 핵심 철학은 **"CSS-First"**입니다.
 > `Removed package: autoprefixer`
 
 v4는 더 가볍고 똑똑해졌습니다.
-* **Autoprefixer 제거:** v4에 내장된 `Lightning CSS`가 벤더 프리픽스(Vendor Prefix) 추가 작업을 알아서 처리하기 때문에, 더 이상 별도의 `autoprefixer` 패키지가 필요 없어져 삭제되었습니다.
+* **Autoprefixer 제거:** v4에 내장된 **`Lightning CSS`** 가 벤더 프리픽스(Vendor Prefix) 추가 작업을 알아서 처리하기 때문에, 더 이상 별도의 `autoprefixer` 패키지가 필요 없어져 삭제되었습니다.
 * **새로운 PostCSS 플러그인:** v4 전용인 `@tailwindcss/postcss`가 설치되어 빌드 파이프라인을 담당하게 됩니다.
 
 ---
