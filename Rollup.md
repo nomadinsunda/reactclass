@@ -1,4 +1,4 @@
-# 🔮 Rollup이란?
+# Rollup이란?
 
 **— ES Module 기반의 “정적 분석(Static Analysis)”에 최적화된 고품질 번들러**
 
@@ -9,7 +9,7 @@ Webpack처럼 범용적인 번들러가 아니라, **“불필요한 코드 없�
 
 ---
 
-# ⭐ Rollup의 핵심 특징 요약
+# Rollup의 핵심 특징 요약
 
 | 기능                         | 설명                                   |
 | -------------------------- | ------------------------------------ |
@@ -17,13 +17,13 @@ Webpack처럼 범용적인 번들러가 아니라, **“불필요한 코드 없�
 | **아주 가벼운 출력물**             | 라이브러리 배포에 적합                         |
 | **플러그인 기반의 확장성**           | ESBuild/SWC와도 연계 가능                  |
 | **Rollup 공식 플러그인 생태계**     | CommonJS, JSON, TypeScript 등         |
-| **Vite의 내부 빌드 엔진**         | Vite의 build 단계는 Rollup이 수행           |
+| **Vite의 내부 빌드 엔진**         | Vite 7까지의 build 단계를 Rollup이 수행 (Vite 8부터는 후계자 Rolldown) |
 
 즉, **“번들 크기 최적화”**에 있어서는 아직도 업계 최고의 품질을 보장합니다.
 
 ---
 
-# 🧩 Rollup의 설계 철학: 정적 분석 중심
+# Rollup의 설계 철학: 정적 분석 중심
 
 Webpack과 달리 Rollup은 **ES Module(ESM) 문법만을 기반으로 설계**되었습니다.
 
@@ -37,15 +37,15 @@ Rollup은 다음과 같은 ESM 특성을 최대한 활용합니다:
 
 즉…
 
-### 💡 “정적 분석을 극대화하여 Dead code를 안전하게 제거”
+### “정적 분석을 극대화하여 Dead code를 안전하게 제거”
 
 Webpack의 tree-shaking보다 안정적이고 단순합니다.
 
 ---
 
-# ⚙️ Rollup이 인기 있는 이유
+# Rollup이 인기 있는 이유
 
-## ✔ 1. 라이브러리 제작에 최적화
+## O 1. 라이브러리 제작에 최적화
 
 React, Vue, Redux 등 주요 라이브러리도 Rollup을 사용해 빌드합니다.
 
@@ -59,7 +59,7 @@ Rollup은 이 점에서 Webpack보다 훨씬 적합합니다.
 
 ---
 
-## ✔ 2. 매우 강력한 Tree-shaking
+## O 2. 매우 강력한 Tree-shaking
 
 Rollup의 tree-shaking은 업계에서 가장 정교합니다.
 
@@ -71,7 +71,7 @@ Rollup의 tree-shaking은 업계에서 가장 정교합니다.
 
 ---
 
-## ✔ 3. Plugin 기반 아키텍처
+## O 3. Plugin 기반 아키텍처
 
 Rollup은 플러그인으로 모든 기능을 확장합니다.
 
@@ -80,26 +80,31 @@ Rollup은 플러그인으로 모든 기능을 확장합니다.
 * @rollup/plugin-node-resolve
 * @rollup/plugin-commonjs
 * @rollup/plugin-typescript
-* rollup-plugin-terser (압축)
+* @rollup/plugin-terser (압축)
+
+> 예전 자료에 자주 나오는 `rollup-plugin-terser`는 **더 이상 유지보수되지 않는 폐기된 패키지**입니다.
+> 공식 스코프로 이관된 **`@rollup/plugin-terser`** 를 쓰세요. 이름만 다른 게 아니라 Rollup 3+ 호환성이 다릅니다.
 
 Rollup은 플러그인 구조가 단순하고 강력하여 **커뮤니티 플러그인 생태계가 매우 풍부합니다.**
 
 ---
 
-## ✔ 4. Vite Build 엔진
+## O 4. Vite Build 엔진
 
-현대 프론트엔드의 핵심 도구 **Vite**는 dev 서버는 ESBuild, 빌드 단계는 **Rollup**을 사용합니다.
+**Vite 5\~7**은 dev 서버는 esbuild, 빌드 단계는 **Rollup**을 사용했습니다.
 
 왜 그럴까요?
 
-* Dev 서버: 빠른 HMR → esbuild
-* Production 빌드: 고품질 번들 → rollup
+* Dev 서버: 빠른 HMR → esbuild (파일 1개를 최대한 빨리 변환)
+* Production 빌드: 고품질 번들 → Rollup (전체 그래프를 보고 트리셰이킹·청크 분할)
 
 즉, Rollup은 “최종 출력”의 품질을 높이기 위한 핵심 엔진으로 선택되었습니다.
 
+> **단, Vite 8(2026년 3월)부터는 Rollup이 아니라 Rolldown을 씁니다.** 아래 절에서 설명합니다.
+
 ---
 
-# 🔧 Rollup 기본 사용 예제
+# Rollup 기본 사용 예제
 
 ### 1) 설치
 
@@ -127,7 +132,7 @@ npx rollup -c
 
 ---
 
-# 🔍 Rollup 출력 포맷(format) 종류
+# Rollup 출력 포맷(format) 종류
 
 | format   | 설명                           |
 | -------- | ---------------------------- |
@@ -140,7 +145,7 @@ npx rollup -c
 
 ---
 
-# 📦 Rollup과 Webpack의 차이 (핵심 비교)
+# Rollup과 Webpack의 차이 (핵심 비교)
 
 | 항목           | Rollup             | Webpack                 |
 | ------------ | ------------------ | ----------------------- |
@@ -151,11 +156,11 @@ npx rollup -c
 | 코드 분할        | 지원                 | **매우 잘 지원**             |
 | 사용 분야        | 라이브러리              | SPA, 웹 애플리케이션           |
 
-➡ **‘웹앱’은 Webpack / ‘라이브러리’는 Rollup**이라는 공식이 생길 만큼 역할이 확실하게 다릅니다.
+→ **‘웹앱’은 Webpack / ‘라이브러리’는 Rollup**이라는 공식이 생길 만큼 역할이 확실하게 다릅니다.
 
 ---
 
-# 🔮 미래와 현재의 Rollup: Vite와 함께 부활
+# 미래와 현재의 Rollup: Vite와 함께 부활
 
 Rollup은 Webpack에 밀려 한동안 주류에서 멀어졌지만,
 **Vite를 통해 다시 핵심 빌드 엔진으로 자리 잡았습니다.**
@@ -163,12 +168,32 @@ Rollup은 Webpack에 밀려 한동안 주류에서 멀어졌지만,
 * 빠른 Dev → esbuild
 * 고품질 번들 → Rollup
 
-그리고 최근에는 Rollup 3.x/4.x에서 빌드 속도가 크게 향상되어
-**대규모 SPA에서도 Rollup을 직접 사용하는 사례**가 늘고 있습니다.
+그리고 Rollup 3.x/4.x에서 빌드 속도가 크게 향상되어
+**대규모 SPA에서도 Rollup을 직접 사용하는 사례**가 늘었습니다.
 
 ---
 
-# 📌 마무리
+## 그다음 이야기: Rolldown
+
+Rollup의 한계는 **JavaScript로 작성되어 있다는 점**이었습니다. 아무리 알고리즘을 다듬어도 대규모 프로젝트의 빌드 시간은 언어 성능의 벽에 부딪힙니다.
+
+그래서 Vite 팀(Evan You)이 만든 것이 **Rolldown**입니다.
+
+| 항목    | Rollup             | Rolldown                    |
+| ----- | ------------------ | --------------------------- |
+| 구현 언어 | JavaScript         | **Rust**                    |
+| 목표    | 최고 품질의 번들 출력       | **Rollup과 호환되면서 훨씬 빠른 빌드**  |
+| 플러그인  | Rollup 플러그인 생태계    | Rollup 플러그인 API를 **의도적으로 호환** |
+
+* **Vite 8부터 Rolldown이 기본 번들러**가 되어 Rollup과 esbuild를 모두 대체했습니다. 옵션 이름도 `build.rollupOptions` → `build.rolldownOptions`로 바뀌었습니다(옛 이름은 자동 변환).
+* Rolldown이 Rollup의 **플러그인 API를 그대로 흉내 낸 이유**가 중요합니다. 그래야 수년간 쌓인 Rollup 플러그인 생태계를 버리지 않고 그대로 옮겨올 수 있기 때문입니다. 즉 **Rollup은 사라진 것이 아니라, 그 설계가 Rust로 계승된 것**입니다.
+
+> 그래서 **이 문서에서 배우는 Rollup의 개념(정적 분석, 트리셰이킹, 출력 포맷, 플러그인 훅)은 그대로 유효합니다.** 실행 엔진만 바뀌었을 뿐입니다.
+> 또한 Rollup 자체도 **라이브러리 빌드용으로는 여전히 현역**입니다.
+
+---
+
+# 마무리
 
 Rollup은 다음과 같은 상황에서 최고의 선택입니다.
 
@@ -176,8 +201,8 @@ Rollup은 다음과 같은 상황에서 최고의 선택입니다.
 * 모듈 크기가 중요한 상황
 * Tree-shaking이 매우 중요한 상황
 * 다양한 모듈 시스템으로 배포해야 할 때
-* Vite 기반 프로젝트의 Production 빌드
+* Vite 7 이하 기반 프로젝트의 Production 빌드 (Vite 8부터는 같은 역할을 Rolldown이 맡습니다)
 
 즉, Rollup은 **“깔끔한 결과물을 우선하는 번들러”**이며,
-ESBuild의 빠른 개발 경험과 함께 사용할 때 가장 강력해집니다.
+그 설계 철학은 Rolldown에 그대로 계승되어 지금도 유효합니다.
 
