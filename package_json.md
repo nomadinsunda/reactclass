@@ -19,24 +19,24 @@ React, Express, Vue, Nest.js 등 **npm 기반 프로젝트라면 무조건 존�
 
 ```json
 {
-  "name": "my-app",
+  "name": "my-react-app",
   "version": "1.0.0",
-  "description": "나의 Node.js 애플리케이션",
+  "description": "나의 React 애플리케이션",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "test": "jest"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.0",
-    "jest": "^29.0.0"
+    "@vitejs/plugin-react": "^4.3.0",
+    "vite": "^7.0.0"
   },
-  "keywords": ["node", "express", "api"],
+  "keywords": ["react", "vite", "frontend"],
   "author": "홍길동",
   "license": "MIT"
 }
@@ -72,7 +72,7 @@ npm init
 npm init -y
 ```
 
-> `-y`는 모든 기본 값을 자동으로 채워줍니다.
+> `-y`는 모든 디폴트 값을 자동으로 채워줍니다.
 
 ---
 
@@ -81,20 +81,22 @@ npm init -y
 * **패키지 설치 시 자동으로 업데이트됨**
 
   ```bash
-  npm install express
+  npm install axios
   ```
 
   → 자동으로 `dependencies`에 추가됨
 
 * **npm 스크립트를 활용한 자동화**
 
-  ```json
+```json
+ {
   "scripts": {
-    "build": "webpack",
-    "lint": "eslint .",
-    "test": "jest"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   }
-  ```
+}
+```
 
 ---
 
