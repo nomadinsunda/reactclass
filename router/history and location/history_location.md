@@ -1,4 +1,4 @@
-# React Router를 이해하기 위한 브라우저의 Location과 History
+# React Router를 이해하기 위한 브라우저의 History와 Location 
 
 React Router를 처음 배우면 다음 코드부터 접하는 경우가 많습니다.
 
@@ -156,8 +156,8 @@ location.pathname
 
 ```text
 https://shop.example.com/products/100
-                         └──────┬──────┘
-                              pathname
+                        └──────┬────┘
+                            pathname
 ```
 
 ```javascript
