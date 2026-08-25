@@ -106,6 +106,9 @@ window
 
 입니다.
 
+
+<img src="./images/browser_location.png" width="100%">
+
 예를 들어:
 
 ```javascript
@@ -548,6 +551,9 @@ React UI만 변경
 # 9. `window.history`란?
 
 `window.history`는 현재 탭의 **세션 히스토리(session history)** 와 상호작용할 수 있도록 제공되는 객체입니다.
+
+<img src="./images/browser_history.png" width="100%">
+
 
 브라우저를 사용하면서:
 

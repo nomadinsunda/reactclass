@@ -1,4 +1,4 @@
-# `history.pushState()`와 `popstate` — SPA 라우팅의 브라우저 기반
+# `history.pushState()`와 `popstate` - SPA 라우팅의 브라우저 기반
 
 `history.pushState()`와 `popstate`는 브라우저의 **Session History(세션 히스토리)** 를 JavaScript에서 다루기 위한 핵심 기능입니다.
 
@@ -15,6 +15,9 @@ History 기록도 유지
 ```
 
 즉, SPA에서도 일반 웹사이트처럼 **URL, 뒤로가기, 앞으로가기, 북마크, 링크 공유**를 사용할 수 있도록 만드는 기반입니다.
+
+<img src="./images/pushstate_popstate.png" width="100%">
+
 
 ---
 
@@ -91,7 +94,7 @@ Before
                                 Current
 
 
-                    Back
+                    Back 수행
 
 
 After
