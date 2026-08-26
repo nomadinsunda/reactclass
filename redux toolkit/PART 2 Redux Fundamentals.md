@@ -1,18 +1,36 @@
 # PART 2. Redux Fundamentals
 
-Redux Toolkit을 제대로 이해하려면 먼저 Redux가 어떤 문제를 해결하기 위해 등장했으며, Redux 내부에서 상태가 어떤 흐름으로 변경되는지를 이해해야 합니다.
+Redux Toolkit을 제대로 이해하려면 `createSlice()`, `configureStore()` 같은 API부터 외우기보다 먼저 **Redux가 어떤 문제를 해결하기 위해 등장했고, 상태가 어떤 흐름으로 변경되는지**를 이해해야 합니다.
 
-Redux Toolkit의 `createSlice()`, `configureStore()` 같은 API부터 외우기 시작하면 `dispatch`, `action`, `reducer`, `store`의 관계가 모호해지기 쉽습니다.
+Redux의 핵심은 API가 아니라 다음 흐름에 있습니다.
 
-따라서 이 PART에서는 Redux Toolkit을 사용하기 전에 **Redux의 핵심 동작 원리**부터 이해합니다.
+```text
+Event
+  ↓
+Action
+  ↓
+dispatch()
+  ↓
+Store
+  ↓
+Reducer
+  ↓
+New State
+  ↓
+Store
+  ↓
+UI
+```
+
+이 흐름을 이해하면 이후 Redux Toolkit에서 등장하는 `createSlice()`, `configureStore()`, `useSelector()`, `useDispatch()`도 훨씬 자연스럽게 연결됩니다.
 
 ---
 
-# 1. React의 State
+# 1. 출발점: React의 State
 
-React 애플리케이션에서 화면에 표시되는 데이터는 일반적으로 컴포넌트의 State로 관리할 수 있습니다.
+React 애플리케이션에서 화면에 표시되는 데이터는 일반적으로 컴포넌트의 State로 관리합니다.
 
-```javascript
+```jsx
 import { useState } from "react";
 
 function Counter() {
@@ -30,18 +48,18 @@ function Counter() {
 }
 ```
 
-이 경우 `count`는 `Counter` 컴포넌트가 관리하는 State입니다.
+여기서 `count`는 `Counter` 컴포넌트가 관리하는 State입니다.
 
 ```text
 Counter Component
 │
 ├── State
-│     └── count = 0
+│    └── count = 0
 │
 ├── setCount()
 │
 └── UI
-      └── {count}
+     └── {count}
 ```
 
 버튼을 클릭하면 다음 과정이 발생합니다.
@@ -60,63 +78,58 @@ Component Re-render
 변경된 UI
 ```
 
-이 정도의 애플리케이션에서는 Redux가 필요하지 않습니다.
+이 정도 규모라면 Redux가 필요하지 않습니다.
 
 ---
 
-# 2. React State의 범위
+# 2. React State는 컴포넌트에 소속된다
 
-중요한 것은 React의 State가 기본적으로 **해당 State를 선언한 컴포넌트에 소속된다**는 것입니다.
+React State를 이해할 때 중요한 특징이 있습니다.
 
-```javascript
+> **State는 기본적으로 그 State를 선언한 컴포넌트에 소속됩니다.**
+
+예를 들어:
+
+```jsx
 function App() {
-
     const [user, setUser] = useState(null);
 
     return (
         <>
-            <Header />
-            <Main />
-            <Sidebar />
+            <Header user={user} />
+            <Main user={user} />
+            <Sidebar user={user} />
         </>
     );
 }
 ```
 
-`user`는 `App`이 관리합니다.
+`user` State는 `App`이 관리합니다.
 
-그런데 다음 컴포넌트들이 모두 사용자 정보를 필요로 한다고 가정해봅시다.
+하지만 여러 컴포넌트가 `user`를 필요로 한다면 상위 컴포넌트에서 하위 컴포넌트로 전달해야 합니다.
 
 ```text
 App
 │
 ├── Header
-│     └── 사용자 이름
+│    └── 사용자 이름
 │
 ├── Main
-│     └── 사용자 정보
+│    └── 사용자 정보
 │
 └── Sidebar
-      └── 사용자 권한
+     └── 사용자 권한
 ```
 
-그러면 상위 컴포넌트에서 하위 컴포넌트로 데이터를 전달해야 합니다.
+애플리케이션이 작다면 이것은 문제가 아닙니다.
 
-```jsx
-<Header user={user} />
-<Main user={user} />
-<Sidebar user={user} />
-```
-
-애플리케이션이 작다면 문제가 되지 않습니다.
-
-하지만 컴포넌트 구조가 깊어지면 문제가 발생할 수 있습니다.
+문제는 컴포넌트 구조가 깊어질 때 나타납니다.
 
 ---
 
 # 3. Props Drilling
 
-다음 구조를 생각해봅시다.
+다음과 같은 컴포넌트 트리를 생각해봅시다.
 
 ```text
 App
@@ -130,25 +143,25 @@ Content
 UserProfile
 ```
 
-`App`이 가지고 있는 `user`를 `UserProfile`에서 사용해야 한다면 중간 컴포넌트들이 `user`를 사용하지 않더라도 전달해야 할 수 있습니다.
+`App`이 가지고 있는 `user`를 가장 아래의 `UserProfile`에서 사용해야 한다면 중간 컴포넌트들이 `user`를 사용하지 않더라도 계속 전달해야 할 수 있습니다.
 
 ```jsx
-<Layout user={user}>
+<Layout user={user} />
 ```
 
 ```jsx
-<Main user={user}>
+<Main user={user} />
 ```
 
 ```jsx
-<Content user={user}>
+<Content user={user} />
 ```
 
 ```jsx
-<UserProfile user={user}>
+<UserProfile user={user} />
 ```
 
-즉,
+결국 데이터가 다음과 같이 이동합니다.
 
 ```text
 App
@@ -166,37 +179,35 @@ Content
 UserProfile
 ```
 
-와 같은 구조가 됩니다.
+이러한 현상을 흔히 **Props Drilling**이라고 합니다.
 
-이러한 상황을 흔히 **Props Drilling**이라고 합니다.
+중요한 점은 Props Drilling 자체가 잘못된 것은 아니라는 것입니다.
 
-Props Drilling 자체가 잘못된 것은 아닙니다.
-
-문제는 애플리케이션이 커지고 여러 컴포넌트가 동일한 상태를 공유하면서 상태의 전달과 변경 흐름이 복잡해질 수 있다는 것입니다.
+문제는 애플리케이션이 커지고 여러 컴포넌트가 동일한 상태를 공유하기 시작하면 **상태를 어디에 두고, 누가 변경하며, 어떻게 변경되었는지를 관리하기 어려워질 수 있다는 것**입니다.
 
 ---
 
-# 4. 공유 상태(Shared State)
+# 4. Shared State
 
 쇼핑몰 애플리케이션을 생각해봅시다.
 
-여러 컴포넌트에서 다음과 같은 상태가 필요할 수 있습니다.
+애플리케이션 전체에서 다음과 같은 상태가 필요할 수 있습니다.
 
 ```text
 로그인 사용자
 장바구니
+검색 / 필터 조건
 UI 설정
-검색/필터 조건
 ```
 
-예를 들어 장바구니 상태는 다음 컴포넌트에서 동시에 필요할 수 있습니다.
+특히 장바구니 State는 여러 컴포넌트가 함께 사용할 수 있습니다.
 
 ```text
 Header
  └── 장바구니 상품 개수
 
 ProductDetail
- └── 장바구니 추가
+ └── 장바구니 상품 추가
 
 CartPage
  └── 장바구니 목록
@@ -205,19 +216,19 @@ CheckoutPage
  └── 주문 상품
 ```
 
-이처럼 여러 컴포넌트가 함께 사용하는 상태를 **Shared State**라고 생각할 수 있습니다.
+이처럼 여러 부분에서 함께 사용하는 상태를 **Shared State**라고 생각할 수 있습니다.
 
-애플리케이션이 커질수록 다음 문제가 중요해집니다.
+애플리케이션이 커질수록 다음 질문이 중요해집니다.
 
-> 공유 상태를 어디에 보관할 것인가?
+> 공유 State를 어디에 보관할 것인가?
 
-> 상태를 누가 변경할 수 있는가?
+> 누가 State를 변경할 수 있는가?
 
-> 상태가 어떻게 변경되었는가?
+> 어떤 이유로 State가 변경되었는가?
 
-> 상태가 변경되면 어떤 컴포넌트가 영향을 받는가?
+> State 변경 과정을 어떻게 추적할 것인가?
 
-Redux는 이러한 상태 관리 문제를 체계적으로 해결하기 위해 사용할 수 있는 도구입니다.
+Redux는 바로 이러한 문제를 **일관된 상태 변경 흐름**으로 관리하기 위한 도구입니다.
 
 ---
 
@@ -225,33 +236,35 @@ Redux는 이러한 상태 관리 문제를 체계적으로 해결하기 위해 �
 
 Redux는 JavaScript 애플리케이션의 **예측 가능한 상태 관리(Predictable State Management)**를 위한 라이브러리입니다.
 
-Redux의 핵심 아이디어는 단순합니다.
-
-애플리케이션에서 공유해야 하는 상태를 중앙의 **Store**에서 관리합니다.
+Redux에서는 공유할 상태를 중앙의 **Store**에서 관리합니다.
 
 ```text
              Redux Store
-          ┌───────────────┐
-          │     State     │
-          │               │
-          │ user          │
-          │ cart          │
-          │ filter        │
-          └───────────────┘
-             ↑         ↓
-             │         │
+        ┌──────────────────┐
+        │      State       │
+        │                  │
+        │ user             │
+        │ cart             │
+        │ filter           │
+        └──────────────────┘
+             ↑        ↓
+             │        │
        상태 변경 요청   상태 조회
-             │         │
-       React Components
+             │        │
+        React Components
 ```
 
-하지만 Redux는 단순히 "전역 변수를 만들어주는 라이브러리"가 아닙니다.
+하지만 Redux를 단순히 다음과 같이 이해하면 안 됩니다.
 
-Redux에서 중요한 것은 **상태 변경 절차를 명확하게 통제한다는 것**입니다.
+```text
+Redux = 전역 변수를 만드는 도구
+```
+
+Redux에서 더 중요한 것은 **State를 어디에 저장하느냐보다 State가 변경되는 절차를 통제하는 것**입니다.
 
 ---
 
-# 6. Redux를 전역 변수로 이해하면 안 되는 이유
+# 6. 왜 그냥 전역 객체를 사용하지 않는가?
 
 다음과 같은 전역 객체가 있다고 생각해봅시다.
 
@@ -261,13 +274,13 @@ const state = {
 };
 ```
 
-어디에서든 다음과 같이 변경할 수 있다면:
+어디에서든 다음처럼 변경할 수 있다면:
 
 ```javascript
 state.count++;
 ```
 
-애플리케이션 규모가 커졌을 때 문제가 발생합니다.
+애플리케이션이 커졌을 때 문제가 발생합니다.
 
 ```text
 Component A ──┐
@@ -276,25 +289,24 @@ Component C ──┤
 Function D  ──┘
 ```
 
-`count`가 예상하지 못한 값이 되었을 때 어떤 코드가 상태를 변경했는지 추적하기 어려워집니다.
+`count`가 예상하지 못한 값이 되었을 때 **누가, 언제, 왜 변경했는지 추적하기 어려워집니다.**
 
-Redux는 이런 방식으로 상태를 관리하지 않습니다.
-
-Redux에서는 상태 변경에 **정해진 흐름**이 존재합니다.
+Redux는 State 변경을 이런 방식으로 허용하지 않습니다.
 
 ```text
-상태를 직접 변경
+직접 변경
 
-Component ───────────X──────────→ State
+Component ────────── X ─────────→ State
+```
 
+대신 정해진 흐름을 사용합니다.
 
-Redux 방식
-
+```text
 Component
     ↓
 Action
     ↓
-dispatch
+dispatch()
     ↓
 Store
     ↓
@@ -303,59 +315,56 @@ Reducer
 New State
 ```
 
-이 흐름이 Redux를 이해하는 핵심입니다.
+이 **정해진 상태 변경 경로**가 Redux의 핵심입니다.
 
 ---
 
 # 7. Redux의 핵심 구성 요소
 
-Redux를 이해하려면 다음 개념의 관계를 이해해야 합니다.
+Redux의 핵심 개념은 다음 여섯 가지입니다.
+
+| 구성 요소              | 역할                             |
+| ------------------ | ------------------------------ |
+| **State**          | 현재 애플리케이션의 상태 데이터              |
+| **Store**          | State와 Redux 처리 흐름을 관리         |
+| **Action**         | 발생한 일을 표현하는 객체                 |
+| **Action Creator** | Action 객체를 생성하는 함수             |
+| **dispatch()**     | Action을 Store에 전달              |
+| **Reducer**        | 현재 State와 Action으로 다음 State 계산 |
+
+이 개념들을 각각 암기하기보다 **하나의 흐름으로 연결해서 이해하는 것**이 중요합니다.
 
 ```text
-Store
-State
-Action
-Action Creator
-dispatch
-Reducer
+┌────────────────────┐
+│  React Component   │
+└─────────┬──────────┘
+          │
+          │ dispatch(action)
+          ↓
+┌────────────────────┐
+│       Store        │
+└─────────┬──────────┘
+          │
+          │ current state + action
+          ↓
+┌────────────────────┐
+│      Reducer       │
+└─────────┬──────────┘
+          │
+          │ new state
+          ↓
+┌────────────────────┐
+│       Store        │
+│     New State      │
+└─────────┬──────────┘
+          │
+          ↓
+┌────────────────────┐
+│  React Component   │
+└────────────────────┘
 ```
 
-각각을 따로 암기하기보다 하나의 데이터 흐름으로 이해해야 합니다.
-
-전체 구조를 먼저 보면 다음과 같습니다.
-
-```text
-          ┌──────────────────┐
-          │ React Component  │
-          └────────┬─────────┘
-                   │
-                   │ dispatch(action)
-                   ↓
-          ┌──────────────────┐
-          │      Store       │
-          └────────┬─────────┘
-                   │
-                   │ current state
-                   │ + action
-                   ↓
-          ┌──────────────────┐
-          │     Reducer      │
-          └────────┬─────────┘
-                   │
-                   │ new state
-                   ↓
-          ┌──────────────────┐
-          │      Store       │
-          │   New State      │
-          └────────┬─────────┘
-                   │
-                   ↓
-          ┌──────────────────┐
-          │ React Component  │
-          └──────────────────┘
-```
-
-이제 각각을 살펴보겠습니다.
+이제 각각의 역할을 살펴보겠습니다.
 
 ---
 
@@ -363,7 +372,7 @@ Reducer
 
 State는 **현재 애플리케이션의 상태를 표현하는 데이터**입니다.
 
-예를 들어 쇼핑몰의 Redux State가 다음과 같다고 생각할 수 있습니다.
+예를 들어 쇼핑몰의 Redux State는 다음과 같을 수 있습니다.
 
 ```javascript
 {
@@ -382,7 +391,7 @@ State는 **현재 애플리케이션의 상태를 표현하는 데이터**입니
 }
 ```
 
-개념적으로는:
+구조적으로 보면:
 
 ```text
 Application State
@@ -398,7 +407,7 @@ Application State
      └── category
 ```
 
-Redux Store는 이러한 State를 보관합니다.
+Redux에서는 이 State를 **Store가 관리합니다.**
 
 ---
 
@@ -406,11 +415,9 @@ Redux Store는 이러한 State를 보관합니다.
 
 **Store는 Redux 상태 관리의 중심 객체입니다.**
 
-Store는 단순히 State만 저장하는 객체가 아닙니다.
+Store를 단순히 State를 저장하는 객체라고만 이해하면 부족합니다.
 
-Store는 Redux의 전체 상태 관리 흐름을 관리합니다.
-
-개념적으로 Store는 다음 역할을 수행합니다.
+Store는 개념적으로 다음 역할을 담당합니다.
 
 ```text
 Redux Store
@@ -424,24 +431,22 @@ Redux Store
 └── State 변경 알림
 ```
 
-따라서 다음과 같이 이해하는 것이 좋습니다.
+따라서 반드시 다음을 구분해야 합니다.
 
 ```text
 Store ≠ State
-
-Store
- └── State를 관리하는 객체
 ```
 
-State는 **데이터**이고 Store는 그 데이터를 **관리하는 Redux 객체**입니다.
+* **State** → 관리되는 데이터
+* **Store** → 그 State와 Redux 처리 흐름을 관리하는 객체
 
 ---
 
 # 10. Action
 
-Redux에서는 Component가 State를 직접 변경하지 않습니다.
+Redux에서는 Component가 Redux State를 직접 변경하지 않습니다.
 
-대신 다음과 같은 객체를 Redux에게 전달합니다.
+대신 **무슨 일이 발생했는지를 설명하는 객체**를 Store에 전달합니다.
 
 ```javascript
 {
@@ -451,21 +456,12 @@ Redux에서는 Component가 State를 직접 변경하지 않습니다.
 
 이 객체를 **Action**이라고 합니다.
 
-Action은 쉽게 말하면:
-
-> "어떤 일이 발생했다."
-
-또는
-
-> "이러한 상태 변경이 필요하다."
-
-라는 정보를 표현하는 일반 JavaScript 객체입니다.
-
-예를 들어:
+추가 데이터가 필요한 경우 일반적으로 `payload`를 사용합니다.
 
 ```javascript
 {
-    type: "cart/addItem",
+    type: "cart/itemAdded",
+
     payload: {
         id: 10,
         name: "Keyboard"
@@ -477,27 +473,23 @@ Action은 쉽게 말하면:
 
 ```text
 type
-```
+ └── 어떤 종류의 사건이 발생했는가?
 
-은 어떤 종류의 Action인지 나타냅니다.
-
-```text
 payload
+ └── 그 사건과 함께 전달할 데이터
 ```
 
-는 Action과 함께 전달할 추가 데이터를 담는 데 일반적으로 사용합니다.
+라고 이해할 수 있습니다.
 
----
+### Action은 명령이라기보다 사건이다
 
-# 11. Action은 명령이라기보다 사건을 표현한다
-
-Action을 처음 배울 때 다음과 같이 생각하기 쉽습니다.
+Action을 다음과 같이 이해하기 쉽습니다.
 
 ```text
 "count를 증가시켜라."
 ```
 
-하지만 Redux의 Action은 보통 **무슨 일이 발생했는지를 표현하는 데이터**라고 이해하는 것이 좋습니다.
+하지만 Redux에서는 Action을 **상태 변경과 관련하여 무슨 일이 발생했는지를 설명하는 데이터**라고 이해하는 것이 더 좋습니다.
 
 예:
 
@@ -508,31 +500,21 @@ Action을 처음 배울 때 다음과 같이 생각하기 쉽습니다.
 }
 ```
 
-즉,
-
-```text
-Action
-=
-상태 변경과 관련하여 발생한 일을 설명하는 데이터
-```
-
-입니다.
-
-실제 State를 어떻게 변경할지는 **Reducer가 결정합니다.**
+Action은 사건을 표현하고, **실제로 State를 어떻게 변경할지는 Reducer가 결정합니다.**
 
 ---
 
-# 12. Action Creator
+# 11. Action Creator
 
-매번 Action 객체를 직접 작성할 수도 있습니다.
+Action 객체를 매번 직접 작성할 수도 있습니다.
 
 ```javascript
-dispatch({
+store.dispatch({
     type: "counter/increment"
 });
 ```
 
-하지만 Action 객체를 생성하는 함수를 만들 수도 있습니다.
+하지만 Action을 생성하는 함수를 만들 수도 있습니다.
 
 ```javascript
 function increment() {
@@ -545,62 +527,37 @@ function increment() {
 이러한 함수를 **Action Creator**라고 합니다.
 
 ```text
-Action Creator
-      ↓
-Action 생성
-```
-
-즉:
-
-```javascript
-const action = increment();
-```
-
-결과:
-
-```javascript
-{
-    type: "counter/increment"
-}
-```
-
-중요한 차이입니다.
-
-```text
 increment
-    ↓
+   ↓
 Action Creator
 
 increment()
-    ↓
-Action 반환
-
+   ↓
 {
-   type: "counter/increment"
+    type: "counter/increment"
 }
-    ↓
+   ↓
 Action
 ```
 
-Redux Toolkit에서는 나중에 배울 `createSlice()`가 이러한 Action Creator를 자동으로 만들어줍니다.
+따라서 반드시 구분해야 합니다.
+
+```text
+Action Creator = 함수
+Action         = 객체
+```
+
+Redux Toolkit에서는 이후 배우게 될 `createSlice()`가 이러한 Action Creator를 자동으로 생성해줍니다.
 
 ---
 
-# 13. dispatch()
+# 12. dispatch()
 
-Action을 만들었다고 Redux가 자동으로 처리하는 것은 아닙니다.
+Action 객체를 만들었다고 해서 Redux가 자동으로 처리하는 것은 아닙니다.
 
-Action을 Store에 전달해야 합니다.
+Action을 **Store의 처리 흐름으로 전달**해야 합니다.
 
-이때 사용하는 것이:
-
-```javascript
-dispatch()
-```
-
-입니다.
-
-예:
+그 역할을 하는 것이 `dispatch()`입니다.
 
 ```javascript
 store.dispatch({
@@ -608,15 +565,13 @@ store.dispatch({
 });
 ```
 
-또는 Action Creator를 사용하면:
+Action Creator를 사용하면:
 
 ```javascript
 store.dispatch(increment());
 ```
 
-입니다.
-
-이를 분해해서 보면:
+이를 두 단계로 풀어보면 더욱 명확합니다.
 
 ```javascript
 const action = increment();
@@ -624,53 +579,37 @@ const action = increment();
 store.dispatch(action);
 ```
 
-입니다.
-
-따라서 `dispatch()`의 핵심 역할은:
-
-> Action을 Redux Store의 처리 흐름으로 전달하는 것
-
-입니다.
-
-```text
-Component
-    │
-    │ Action 생성
-    ↓
-Action
-    │
-    │ dispatch(action)
-    ↓
-Store
-```
-
-`dispatch()`가 State를 직접 변경하는 것은 아닙니다.
-
----
-
-# 14. Reducer
-
-Store가 Action을 받으면 **Reducer**를 통해 다음 State를 계산합니다.
-
-Reducer는 개념적으로 다음 형태의 함수입니다.
-
-```javascript
-function reducer(state, action) {
-
-    // ...
-
-    return newState;
-}
-```
-
 즉:
 
 ```text
-Reducer
+Action Creator
+      ↓
+    Action
+      ↓
+dispatch(action)
+      ↓
+    Store
+```
 
-(Current State, Action)
-          ↓
-      New State
+여기서 중요한 점이 있습니다.
+
+> **dispatch()가 State를 직접 변경하는 것은 아닙니다.**
+
+`dispatch()`의 역할은 **Action을 Store의 Redux 처리 흐름으로 전달하는 것**입니다.
+
+---
+
+# 13. Reducer
+
+Store가 Action을 받으면 **Reducer를 이용하여 다음 State를 계산합니다.**
+
+Reducer는 개념적으로 다음과 같은 함수입니다.
+
+```javascript
+function reducer(state, action) {
+    // 다음 State 계산
+    return newState;
+}
 ```
 
 수학적인 함수처럼 표현하면:
@@ -679,7 +618,17 @@ Reducer
 f(state, action) → newState
 ```
 
-입니다.
+즉:
+
+```text
+Current State
+      +
+    Action
+      ↓
+   Reducer
+      ↓
+  New State
+```
 
 예를 들어:
 
@@ -704,7 +653,7 @@ function counterReducer(state = { value: 0 }, action) {
 }
 ```
 
-이고 다음 Action이 전달되었다면:
+이고 Action이:
 
 ```javascript
 {
@@ -712,7 +661,7 @@ function counterReducer(state = { value: 0 }, action) {
 }
 ```
 
-Reducer는:
+이라면 Reducer는:
 
 ```javascript
 {
@@ -720,51 +669,49 @@ Reducer는:
 }
 ```
 
-이라는 다음 State를 계산합니다.
+이라는 **다음 State**를 계산합니다.
 
 ---
 
-# 15. Reducer는 Store가 호출한다
+# 14. Reducer는 누가 호출하는가?
 
-이 부분은 매우 중요합니다.
+Redux를 처음 배울 때 특히 중요한 부분입니다.
 
-Component가 Reducer를 직접 호출하는 구조가 아닙니다.
-
-잘못된 이해:
+Component가 Reducer를 직접 호출하는 것이 아닙니다.
 
 ```text
+잘못된 이해
+
 Component
     ↓
-Reducer
+ Reducer
 ```
 
-Redux의 실제 개념적 흐름:
+실제 개념적 흐름은 다음과 같습니다.
 
 ```text
 Component
     ↓
 dispatch(action)
     ↓
-Store
+  Store
     ↓
-Reducer
+ Reducer
 ```
 
-즉 Store가 Redux 흐름의 중심입니다.
-
-Store가 현재 State와 Action을 Reducer에 전달합니다.
+Store가 현재 State와 Action을 Reducer에게 전달합니다.
 
 ```text
                  current state
-                       │
-                       ↓
-Store ───────────→ Reducer
-                       ↑
-                       │
-                     action
+                      │
+                      ↓
+Store ─────────────→ Reducer
+                      ↑
+                      │
+                    action
 ```
 
-Reducer가 다음 State를 반환하면 Store가 그것을 새로운 State로 보관합니다.
+Reducer가 새로운 State를 반환하면 Store가 그것을 새로운 State로 보관합니다.
 
 ```text
 Reducer
@@ -776,30 +723,28 @@ Store
    └── State 갱신
 ```
 
+따라서 **Redux 흐름의 중심은 Store**입니다.
+
 ---
 
-# 16. Reducer와 불변성(Immutability)
+# 15. Reducer와 Immutability
 
-전통적인 Redux Reducer에서는 기존 State 객체를 직접 변경하면 안 됩니다.
+전통적인 Redux Reducer에서는 기존 State 객체를 직접 변경하지 않습니다.
 
-다음 코드는 잘못된 방식입니다.
+다음과 같은 코드는 사용하지 않습니다.
 
 ```javascript
 function reducer(state, action) {
-
     state.value++;
 
     return state;
 }
 ```
 
-기존 객체를 직접 변경하고 있기 때문입니다.
-
-전통적인 Redux에서는 새로운 객체를 만들어 반환합니다.
+대신 새로운 객체를 만들어 반환합니다.
 
 ```javascript
 function reducer(state, action) {
-
     return {
         ...state,
         value: state.value + 1
@@ -807,30 +752,40 @@ function reducer(state, action) {
 }
 ```
 
-즉:
+개념적으로:
 
 ```text
 Old State
-   │
-   X 직접 수정
-   │
-   ↓
+    │
+    X 직접 수정
+    │
+    ↓
 New State Object 생성
 ```
 
-Redux Toolkit에서는 이후 **Immer**를 통해 이 부분을 훨씬 편하게 작성할 수 있습니다.
+이라고 이해할 수 있습니다.
 
-따라서 지금은 다음 원칙만 기억하면 됩니다.
+Redux Toolkit에서는 **Immer**를 사용하기 때문에 나중에는 다음처럼 작성할 수 있습니다.
 
-> Reducer는 현재 State와 Action을 받아 다음 State를 계산한다.
+```javascript
+state.value++;
+```
+
+하지만 이것은 실제 Redux State를 무작정 직접 변경한다는 의미가 아닙니다.
+
+이 부분은 Redux Toolkit에서 자세히 다룹니다.
+
+지금은 다음 원칙에 집중하면 됩니다.
+
+> **Reducer는 현재 State와 Action을 받아 다음 State를 계산한다.**
 
 ---
 
-# 17. Redux의 전체 Data Flow
+# 16. Redux 전체 Data Flow
 
-이제 지금까지의 개념을 하나로 연결해봅시다.
+이제 지금까지 배운 내용을 하나의 흐름으로 연결해봅시다.
 
-초기 상태:
+초기 State:
 
 ```javascript
 {
@@ -838,67 +793,67 @@ Redux Toolkit에서는 이후 **Immer**를 통해 이 부분을 훨씬 편하게
 }
 ```
 
-사용자가 버튼을 클릭합니다.
+사용자가 `+1` 버튼을 클릭했다고 가정합니다.
 
 ```text
-1. User
-   │
-   │ Click
-   ↓
+① User Event
+      │
+      │ Click
+      ↓
 
-2. React Component
-   │
-   │ increment()
-   ↓
+② React Component
+      │
+      │ increment()
+      ↓
 
-3. Action Creator
-   │
-   │ returns
-   ↓
+③ Action Creator
+      │
+      │ returns
+      ↓
 
-4. Action
-   │
-   │ { type: "counter/increment" }
-   ↓
+④ Action
+      │
+      │ { type: "counter/increment" }
+      ↓
 
-5. dispatch(action)
-   │
-   ↓
+⑤ dispatch(action)
+      │
+      ↓
 
-6. Redux Store
-   │
-   │ current state + action
-   ↓
+⑥ Redux Store
+      │
+      │ current state + action
+      ↓
 
-7. Reducer
-   │
-   │ calculates
-   ↓
+⑦ Reducer
+      │
+      │ calculates
+      ↓
 
-8. New State
-   │
-   │ { value: 1 }
-   ↓
+⑧ New State
+      │
+      │ { value: 1 }
+      ↓
 
-9. Redux Store
-   │
-   │ state updated
-   ↓
+⑨ Redux Store
+      │
+      │ State 갱신
+      ↓
 
-10. React
-    │
-    ↓
+⑩ React
+      │
+      ↓
 
-11. UI Re-render
+⑪ UI Re-render
 ```
 
-이것이 Redux의 가장 중요한 흐름입니다.
+이것이 Redux를 이해하는 데 가장 중요한 흐름입니다.
 
 ---
 
-# 18. 코드로 전체 흐름 이해하기
+# 17. 코드로 연결해보기
 
-Redux Toolkit을 사용하기 전에 개념적인 Redux 코드를 살펴보겠습니다.
+먼저 초기 State와 Reducer를 정의합니다.
 
 ```javascript
 const initialState = {
@@ -937,13 +892,13 @@ function increment() {
 }
 ```
 
-호출:
+그리고 다음과 같이 dispatch합니다.
 
 ```javascript
 store.dispatch(increment());
 ```
 
-이를 내부 흐름으로 풀어보면:
+이 한 줄 안에서는 개념적으로 다음 일이 일어납니다.
 
 ```javascript
 const action = increment();
@@ -951,7 +906,7 @@ const action = increment();
 store.dispatch(action);
 ```
 
-Action은:
+`increment()`가 반환하는 Action은:
 
 ```javascript
 {
@@ -959,25 +914,23 @@ Action은:
 }
 ```
 
-Store는 개념적으로:
+입니다.
+
+Store는 현재 State와 Action을 Reducer에 전달합니다.
 
 ```javascript
 const newState = reducer(currentState, action);
 ```
 
-와 같은 작업을 수행합니다.
-
-그리고:
+결국:
 
 ```text
 currentState
-
 { count: 0 }
 
      +
 
 action
-
 { type: "counter/increment" }
 
      ↓
@@ -987,54 +940,51 @@ reducer()
      ↓
 
 newState
-
 { count: 1 }
 ```
 
-이 됩니다.
+이라는 흐름이 만들어집니다.
 
 ---
 
-# 19. Redux의 단방향 데이터 흐름
+# 18. Redux의 단방향 데이터 흐름
 
-Redux의 중요한 특징 중 하나는 **Unidirectional Data Flow**, 즉 단방향 데이터 흐름입니다.
+Redux의 중요한 특징 중 하나는 **Unidirectional Data Flow**, 즉 **단방향 데이터 흐름**입니다.
 
 ```text
-          ┌─────────────┐
-          │     UI      │
-          └──────┬──────┘
-                 │
-              Action
-                 │
-                 ↓
-          ┌─────────────┐
-          │    Store    │
-          └──────┬──────┘
-                 │
-              Reducer
-                 │
-                 ↓
-          ┌─────────────┐
-          │ New State   │
-          └──────┬──────┘
-                 │
-                 ↓
-          ┌─────────────┐
-          │     UI      │
-          └─────────────┘
+┌─────────────┐
+│     UI      │
+└──────┬──────┘
+       │
+       │ Action
+       ↓
+┌─────────────┐
+│    Store    │
+└──────┬──────┘
+       │
+       │ Reducer
+       ↓
+┌─────────────┐
+│  New State  │
+└──────┬──────┘
+       │
+       ↓
+┌─────────────┐
+│     UI      │
+└─────────────┘
 ```
 
-상태 변경 흐름을 한 방향으로 제한함으로써 상태가 어떻게 변경되었는지를 이해하고 추적하기 쉬워집니다.
+State 변경 경로를 일정한 방향으로 제한하기 때문에 **상태가 어떤 과정을 통해 변경되었는지 이해하고 추적하기 쉬워집니다.**
 
 ---
 
-# 20. Redux의 세 가지 기본 원칙
+# 19. Redux의 세 가지 기본 원칙
 
-전통적으로 Redux는 세 가지 기본 원칙으로 설명할 수 있습니다.
+Redux의 구조는 전통적으로 세 가지 기본 원칙으로 설명할 수 있습니다.
 
-## 20.1 Single Source of Truth
+## 19.1 Single Source of Truth
 
-애플리케이션의 Redux 상태는 하나의 Store 안에서 관리됩니다.
+Redux에서 관리하는 애플리케이션 상태는 하나의 Store 안에서 관리됩니다.
 
 ```text
 Redux Store
@@ -1045,27 +995,27 @@ Redux Store
      └── filter
 ```
 
-이 말이 모든 React State를 무조건 Redux Store에 넣으라는 뜻은 아닙니다.
+하지만 이것이 **모든 React State를 Redux에 넣어야 한다는 뜻은 아닙니다.**
 
-컴포넌트 내부에서만 필요한 상태는 여전히 `useState()` 등으로 관리하는 것이 자연스럽습니다.
+컴포넌트 내부에서만 사용하는 상태는 여전히 `useState()` 등으로 관리하는 것이 자연스럽습니다.
 
 ---
 
-## 20.2 State is Read-Only
+## 19.2 State is Read-Only
 
-애플리케이션 코드가 Redux State를 임의로 직접 변경하는 것이 아니라 **Action을 dispatch하여 상태 변경을 요청**합니다.
+애플리케이션 코드에서 Redux State를 임의로 직접 변경하지 않습니다.
+
+상태 변경이 필요한 사건을 **Action으로 표현하여 dispatch**합니다.
 
 ```text
-Component
+state.count++       ❌
 
-state.count++       X
-
-dispatch(action)    O
+dispatch(action)    ✅
 ```
 
 ---
 
-## 20.3 Changes are Made with Reducers
+## 19.3 Changes are Made with Reducers
 
 State가 어떻게 변경될지는 Reducer가 결정합니다.
 
@@ -1079,72 +1029,57 @@ Current State
   New State
 ```
 
-이 세 원칙이 Redux의 예측 가능한 상태 관리 구조를 만듭니다.
+이 세 가지 원칙이 Redux의 **예측 가능한 상태 관리 구조**를 만듭니다.
 
 ---
 
-# 21. Redux에서 각 구성 요소의 책임
+# 20. Redux가 해결하려는 진짜 문제
 
-Redux를 이해할 때 각 요소의 책임을 분리하면 훨씬 쉽습니다.
+Redux를 다음과 같이 정의하는 것은 너무 단순합니다.
 
-| 구성 요소          | 책임                          |
-| -------------- | --------------------------- |
-| State          | 현재 애플리케이션 상태                |
-| Store          | State와 Redux 처리 흐름 관리       |
-| Action         | 발생한 일을 표현하는 데이터             |
-| Action Creator | Action 객체 생성                |
-| `dispatch()`   | Action을 Store에 전달           |
-| Reducer        | State와 Action으로 다음 State 계산 |
+> Redux는 전역 State를 사용하기 위한 라이브러리다.
 
-이를 한 문장으로 연결하면 다음과 같습니다.
+Redux의 더 중요한 가치는 **상태 변경 흐름의 체계화와 예측 가능성**에 있습니다.
 
-> Component에서 Action을 만들고 `dispatch()`를 통해 Store에 전달하면, Store는 Reducer를 이용하여 현재 State와 Action으로 다음 State를 계산하고 새로운 State를 저장한다.
-
-이 문장을 이해하면 Redux의 핵심을 이해한 것입니다.
-
----
-
-# 22. Redux가 해결하는 진짜 문제
-
-Redux를 단순히:
-
-> 전역 State를 사용하기 위한 라이브러리
-
-라고 정의하면 Redux의 핵심을 놓치게 됩니다.
-
-Redux가 제공하는 중요한 가치는 **상태 변경 흐름의 체계화와 예측 가능성**입니다.
-
-Redux가 없다면 상태 변경이 다음처럼 흩어질 수 있습니다.
+상태를 어디에서나 직접 변경할 수 있다면:
 
 ```text
-Component A ──────→ State
-Component B ──────→ State
-Component C ──────→ State
-Function D  ──────→ State
-Timer       ──────→ State
+Component A ─────→ State
+Component B ─────→ State
+Component C ─────→ State
+Function D  ─────→ State
+Timer       ─────→ State
 ```
 
-Redux에서는 이를:
+상태 변경의 원인을 추적하기 어려워질 수 있습니다.
+
+Redux는 이러한 변경을 하나의 일관된 흐름으로 모읍니다.
 
 ```text
-             Action
-               ↓
-             Store
-               ↓
-             Reducer
-               ↓
-              State
+Event
+  ↓
+Action
+  ↓
+dispatch()
+  ↓
+Store
+  ↓
+Reducer
+  ↓
+New State
 ```
 
-라는 일관된 흐름으로 관리합니다.
+따라서 Redux의 핵심을 한 문장으로 정의하면 다음과 같습니다.
+
+> **Redux는 공유 State를 단순히 중앙에 저장하는 것이 아니라, State가 변경되는 경로를 Action → dispatch → Store → Reducer라는 일관된 흐름으로 통제하여 상태 변화를 예측하고 추적하기 쉽게 만드는 상태 관리 라이브러리입니다.**
 
 ---
 
-# 23. 그런데 Redux를 직접 사용하면 코드가 많다
+# 21. 그런데 Vanilla Redux는 코드가 많다
 
-Redux의 구조는 명확하지만 직접 구현하다 보면 반복 코드가 많아집니다.
+Redux의 구조는 명확하지만 전통적인 방식으로 직접 작성하면 반복 코드가 많아집니다.
 
-예를 들어 Action Type:
+Action Type:
 
 ```javascript
 const INCREMENT = "counter/increment";
@@ -1192,15 +1127,15 @@ function counterReducer(state = initialState, action) {
 }
 ```
 
-상태가 많아지면 이러한 코드가 계속 증가합니다.
-
-또한 불변성을 지키기 위한 코드도 반복됩니다.
+특히 중첩 객체의 불변성을 직접 관리하면 코드가 더욱 복잡해질 수 있습니다.
 
 ```javascript
 return {
     ...state,
+
     user: {
         ...state.user,
+
         profile: {
             ...state.user.profile,
             name: action.payload
@@ -1209,17 +1144,15 @@ return {
 };
 ```
 
-Redux의 개념 자체보다 이러한 반복 코드가 개발을 복잡하게 만들었습니다.
+Redux의 핵심 개념이 복잡하다기보다 **이러한 반복적인 작성 방식이 Redux 코드를 장황하게 만들었습니다.**
 
 ---
 
-# 24. Redux Toolkit의 등장
+# 22. Redux Toolkit의 등장
 
-이 문제를 해결하기 위해 현재 Redux에서는 **Redux Toolkit(RTK)**을 표준적인 Redux 작성 방식으로 사용합니다.
+이러한 문제를 해결하기 위해 현대 Redux에서는 **Redux Toolkit(RTK)**을 표준적인 Redux 작성 방식으로 사용합니다.
 
-Redux Toolkit은 Redux를 없앤 새로운 상태 관리 라이브러리가 아닙니다.
-
-중요합니다.
+중요한 것은:
 
 ```text
 Redux Toolkit
@@ -1227,28 +1160,28 @@ Redux Toolkit
 Redux와 다른 상태 관리 원리
 ```
 
-Redux Toolkit은:
+라는 것입니다.
+
+Redux Toolkit은 기존 Redux의 핵심 구조 위에 다음 기능을 제공합니다.
 
 ```text
 Redux의 핵심 원리
-      +
+       +
 반복 코드 감소
-      +
+       +
 안전한 기본 설정
-      +
+       +
 편리한 API
 ```
 
-를 제공하는 도구입니다.
-
-따라서 Redux Toolkit을 사용해도 내부의 기본 흐름은 그대로입니다.
+따라서 Redux Toolkit을 사용하더라도 핵심 데이터 흐름은 그대로입니다.
 
 ```text
 Component
     ↓
 Action
     ↓
-dispatch
+dispatch()
     ↓
 Store
     ↓
@@ -1259,13 +1192,13 @@ New State
 Component
 ```
 
-달라지는 것은 이 구조를 **얼마나 편리하게 작성하느냐**입니다.
+달라지는 것은 **이 구조를 얼마나 편리하게 작성하느냐**입니다.
 
 ---
 
-# 25. Vanilla Redux와 Redux Toolkit 비교
+# 23. Vanilla Redux vs Redux Toolkit
 
-기존 방식에서는:
+Vanilla Redux에서는:
 
 ```javascript
 const INCREMENT = "counter/increment";
@@ -1292,11 +1225,10 @@ function counterReducer(state = initialState, action) {
 }
 ```
 
-Redux Toolkit에서는 나중에 다음과 같은 형태로 작성할 수 있습니다.
+Redux Toolkit에서는 나중에 다음과 같이 작성할 수 있습니다.
 
 ```javascript
 const counterSlice = createSlice({
-
     name: "counter",
 
     initialState: {
@@ -1304,37 +1236,92 @@ const counterSlice = createSlice({
     },
 
     reducers: {
-
         increment(state) {
             state.value++;
         }
-
     }
 });
 ```
 
-코드는 크게 줄어들지만 내부 개념은 사라지지 않습니다.
+코드는 크게 줄어들지만 Redux의 개념이 사라진 것은 아닙니다.
 
-`createSlice()`는 자동으로 필요한 Action Creator와 Reducer 로직을 구성합니다.
+`createSlice()`가 내부적으로 필요한 **Reducer 로직과 Action Creator를 구성**해주는 것입니다.
 
-즉 Redux Toolkit을 제대로 이해하려면 결국:
+따라서 Redux Toolkit을 제대로 이해하려면 먼저 다음 관계를 이해해야 합니다.
 
 ```text
 State
 Action
 Action Creator
-dispatch
+dispatch()
 Reducer
 Store
 ```
 
-를 이해해야 합니다.
+---
+
+# 24. 반드시 구분해야 할 개념
+
+## Store vs State
+
+```text
+Store
+  =
+State와 Redux 처리 흐름을 관리하는 객체
+
+State
+  =
+Store가 관리하는 데이터
+```
 
 ---
 
-# 26. PART 1 핵심 구조
+## Action vs Action Creator
 
-Redux를 처음 접했을 때 가장 먼저 머릿속에 만들어야 하는 그림은 이것입니다.
+```text
+Action
+  =
+발생한 일을 표현하는 JavaScript 객체
+
+Action Creator
+  =
+Action을 만들어 반환하는 함수
+```
+
+---
+
+## dispatch() vs Reducer
+
+```text
+dispatch()
+  =
+Action을 Store의 처리 흐름으로 전달
+
+Reducer
+  =
+현재 State와 Action으로 다음 State 계산
+```
+
+---
+
+## Redux vs Redux Toolkit
+
+```text
+Redux
+  =
+상태 관리 원리와 핵심 라이브러리
+
+Redux Toolkit
+  =
+Redux를 현대적인 방식으로
+편리하게 작성하기 위한 공식 도구 모음
+```
+
+---
+
+# 25. Redux Fundamentals 최종 구조
+
+Redux를 처음 배울 때 가장 먼저 머릿속에 만들어야 하는 그림은 다음과 같습니다.
 
 ```text
 ┌───────────────────────────┐
@@ -1344,7 +1331,7 @@ Redux를 처음 접했을 때 가장 먼저 머릿속에 만들어야 하는 그
               │ User Event
               ↓
 ┌───────────────────────────┐
-│      Action Creator       │
+│       Action Creator      │
 └─────────────┬─────────────┘
               │
               │ Action
@@ -1365,16 +1352,16 @@ Redux를 처음 접했을 때 가장 먼저 머릿속에 만들어야 하는 그
 ┌───────────────────────────┐
 │          Reducer          │
 │                           │
-│ (state, action)           │
-│          ↓                │
-│      new state            │
+│      (state, action)      │
+│             ↓             │
+│         new state         │
 └─────────────┬─────────────┘
               │
               ↓
 ┌───────────────────────────┐
 │        Redux Store        │
 │                           │
-│        New State          │
+│         New State         │
 └─────────────┬─────────────┘
               │
               ↓
@@ -1386,69 +1373,11 @@ Redux를 처음 접했을 때 가장 먼저 머릿속에 만들어야 하는 그
 
 ---
 
-# 27. 반드시 구분해야 할 것
-
-## Store와 State
-
-```text
-Store
-=
-State를 관리하는 Redux 객체
-
-State
-=
-Store가 관리하는 데이터
-```
-
----
-
-## Action과 Action Creator
-
-```text
-Action
-=
-JavaScript 객체
-
-Action Creator
-=
-Action을 만들어 반환하는 함수
-```
-
----
-
-## dispatch와 Reducer
-
-```text
-dispatch
-=
-Action을 Store의 처리 흐름으로 전달
-
-Reducer
-=
-현재 State와 Action으로 다음 State 계산
-```
-
----
-
-## Redux와 Redux Toolkit
-
-```text
-Redux
-=
-상태 관리 원리와 핵심 라이브러리
-
-Redux Toolkit
-=
-Redux를 현대적인 방식으로 편리하게 작성하기 위한 공식 도구 모음
-```
-
----
-
-# 28. PART 1 최종 정리
+# 26. 최종 정리
 
 Redux의 전체 동작을 한 문장으로 설명할 수 있어야 합니다.
 
-> React Component에서 상태 변경이 필요한 사건이 발생하면 Action을 `dispatch()`하고, Redux Store는 현재 State와 Action을 Reducer에 전달하여 다음 State를 계산한 뒤 새로운 State를 저장하며, React는 변경된 Redux State를 기반으로 필요한 UI를 다시 렌더링한다.
+> **React Component에서 상태 변경이 필요한 사건이 발생하면 Action을 `dispatch()`하고, Redux Store는 현재 State와 Action을 Reducer에 전달하여 다음 State를 계산한 뒤 새로운 State를 저장하며, React는 변경된 Redux State를 기반으로 필요한 UI를 다시 렌더링합니다.**
 
 그리고 다음 흐름을 기억합니다.
 
@@ -1470,32 +1399,52 @@ Store
 React
 ```
 
-이 흐름은 이후 Redux Toolkit을 사용하더라도 바뀌지 않습니다.
+이 흐름은 Redux Toolkit을 사용하더라도 사라지지 않습니다.
 
 ---
 
-# 다음 단계
+# 다음 단계 — Redux Toolkit
 
-PART 2에서는 이 Redux 구조를 실제 React 애플리케이션에 적용하면서 다음 내용을 학습합니다.
+이제 Redux의 기본 구조를 이해했으므로 다음 단계에서는 이를 실제 React 애플리케이션에 연결합니다.
 
 ```text
+Redux Fundamentals
+        ↓
 Redux Toolkit
-      ↓
+        ↓
 createSlice()
-      ↓
+        ↓
 Slice
-      ↓
+        ↓
 Immer
-      ↓
+        ↓
 configureStore()
-      ↓
+        ↓
 Provider
-      ↓
+        ↓
 useSelector()
-      ↓
+        ↓
 useDispatch()
-      ↓
+        ↓
 React + Redux Toolkit
 ```
 
-PART 1에서 배운 `State`, `Action`, `Action Creator`, `dispatch`, `Reducer`, `Store`가 Redux Toolkit에서 각각 어떻게 구현되고 자동화되는지를 연결하는 것이 PART 2의 핵심입니다.
+여기서 중요한 것은 새로운 개념을 처음부터 다시 배우는 것이 아닙니다.
+
+Redux Fundamentals에서 배운 개념들이 Redux Toolkit에서 **어떻게 구현되고 자동화되는지를 연결하는 것**입니다.
+
+```text
+Redux Fundamentals          Redux Toolkit
+
+Action Creator       ───→   createSlice()가 생성
+Reducer              ───→   createSlice()가 구성
+Immutability         ───→   Immer가 지원
+Store                ───→   configureStore()
+State 조회           ───→   useSelector()
+dispatch             ───→   useDispatch()
+React 연결           ───→   Provider
+```
+
+즉,
+
+> **Redux Toolkit을 배우는 것은 Redux를 버리고 새로운 상태 관리 방식을 배우는 것이 아니라, 지금까지 배운 Redux의 원리를 더 편리하고 안전하게 사용하는 방법을 배우는 것입니다.**
