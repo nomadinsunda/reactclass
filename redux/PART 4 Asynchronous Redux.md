@@ -1,710 +1,625 @@
 # PART 4. Asynchronous Redux
 
-## — Middleware, Thunk, Promise, `createAsyncThunk()`까지
+## Redux에서 비동기 작업은 어떻게 처리하는가?
 
-PART 3에서는 Redux Toolkit을 사용하여 React 애플리케이션의 **동기적인 State**를 관리하는 방법을 학습했습니다.
-
-기본 흐름은 다음과 같았습니다.
+앞에서 배운 Redux의 기본 데이터 흐름은 다음과 같습니다.
 
 ```text
-React Component
-      ↓
-Action Creator
-      ↓
 Action
-      ↓
+  ↓
 dispatch()
-      ↓
-Redux Store
-      ↓
-Reducer
-      ↓
-New State
-      ↓
-useSelector()
-      ↓
-React Re-render
-```
-
-예를 들어 Counter 값을 증가시키는 작업은 단순합니다.
-
-```javascript
-dispatch(increment());
-```
-
-Action이 dispatch되면 Reducer가 새로운 State를 계산합니다.
-
-하지만 실제 웹 애플리케이션에서는 서버와 통신해야 하는 경우가 많습니다.
-
-```text
-로그인
-회원 정보 조회
-상품 목록 조회
-게시글 조회
-주문 생성
-파일 업로드
-데이터 저장
-```
-
-이러한 작업은 즉시 끝나지 않습니다.
-
-```text
-Request
-   ↓
-대기...
-   ↓
-Response
-```
-
-즉 **Asynchronous Operation**이 필요합니다.
-
-이번 PART의 핵심 질문은 이것입니다.
-
-> **Reducer는 State를 계산하는 함수인데, API Request 같은 비동기 작업은 Redux의 어디에서 처리해야 할까?**
-
-이 질문에서 Redux의 **Middleware와 Thunk**가 등장합니다.
-
----
-
-# 1. 동기적인 Redux와 비동기 작업
-
-동기적인 Redux 작업을 먼저 다시 생각해봅시다.
-
-```javascript
-dispatch(increment());
-```
-
-Action:
-
-```javascript
-{
-    type: "counter/increment"
-}
-```
-
-Reducer:
-
-```javascript
-increment(state) {
-    state.value++;
-}
-```
-
-전체 흐름은 매우 짧습니다.
-
-```text
-dispatch(action)
-      ↓
-Reducer
-      ↓
-New State
-```
-
-반면 서버에서 상품 목록을 가져오는 작업은 다릅니다.
-
-```javascript
-const response =
-    await fetch("/api/products");
-
-const products =
-    await response.json();
-```
-
-중간에 서버의 응답을 기다려야 합니다.
-
-```text
-Request
-   ↓
-Promise Pending
-   ↓
-Response
-```
-
-따라서 단순한:
-
-```text
-Action
   ↓
 Reducer
   ↓
-State
+New State
+  ↓
+UI 업데이트
 ```
 
-구조만으로 비동기 작업 자체를 표현하기는 어렵습니다.
-
----
-
-# 2. 왜 Reducer에서 API를 호출하면 안 되는가?
-
-다음과 같은 코드를 작성하면 어떨까요?
-
-```javascript
-const productSlice = createSlice({
-    name: "products",
-
-    initialState: {
-        items: []
-    },
-
-    reducers: {
-        loadProducts: async (state) => {
-            const response =
-                await fetch("/api/products");
-
-            const products =
-                await response.json();
-
-            state.items = products;
-        }
-    }
-});
-```
-
-이 코드는 Redux Reducer의 역할에 맞지 않습니다.
-
-Reducer의 기본 역할은:
-
-```text
-Current State
-     +
-   Action
-     ↓
-  Reducer
-     ↓
- New State
-```
-
-입니다.
-
-즉 Reducer는 **State 계산**에 집중해야 합니다.
-
-API Request와 같은 작업은 State 계산 자체가 아니라 **Side Effect**입니다.
-
----
-
-# 3. Side Effect와 Pure Reducer
-
-Side Effect는 함수가 단순히 입력을 이용해 결과를 계산하는 것을 넘어 **외부 세계와 상호작용하거나 외부 상태에 의존하는 작업**을 의미합니다.
-
-대표적으로:
-
-```text
-HTTP Request
-Database Access
-File I/O
-setTimeout()
-localStorage
-현재 시간 읽기
-Random 값 생성
-```
-
-등이 있습니다.
+이 구조는 동기적인 State 변경을 이해하기에는 충분합니다.
 
 예를 들어:
 
-```javascript
+```js
+dispatch(increment());
+```
+
+를 실행하면 Action이 Reducer에 전달되고 Reducer는 새로운 State를 계산합니다.
+
+하지만 실제 애플리케이션에서는 다음과 같은 작업이 필요합니다.
+
+```text
+로그인
+상품 목록 조회
+회원 정보 조회
+게시글 조회
+주문 생성
+파일 업로드
+```
+
+이러한 작업은 대부분 서버와 통신해야 합니다.
+
+즉,
+
+```text
+Request
+   ↓
+대기
+   ↓
+Response
+```
+
+라는 시간이 필요한 비동기 작업입니다.
+
+여기서 문제가 발생합니다.
+
+> Reducer는 State를 계산하는 역할을 담당하는데 API 요청은 어디에서 처리해야 할까?
+
+이 질문에서 Redux의 **Middleware와 Thunk**가 시작됩니다.
+
+---
+
+# PART 4-1. Asynchronous Redux
+
+## 왜 비동기 작업을 위해 Middleware와 Thunk가 필요한가?
+
+### 1. Reducer의 역할
+
+Reducer는 다음과 같은 함수입니다.
+
+```js
+(state, action) => newState
+```
+
+즉,
+
+> 현재 State와 Action을 이용하여 새로운 State를 계산합니다.
+
+Reducer는 State 계산에 집중해야 합니다.
+
+따라서 다음과 같은 Side Effect를 Reducer 내부에서 수행하지 않습니다.
+
+```text
+API Request
+Timer
+Logging
+파일 처리
+외부 시스템 접근
+```
+
+예를 들어 다음과 같은 코드를 Reducer에 넣는 구조는 적절하지 않습니다.
+
+```js
+function reducer(state, action) {
+  fetch("/api/products");
+
+  return state;
+}
+```
+
+API 호출은 State 계산이 아니라 외부 시스템과의 상호작용입니다.
+
+따라서 다음처럼 역할을 분리해야 합니다.
+
+```text
+비동기 작업
+API Request
+     ↓
+결과를 Action으로 변환
+     ↓
+Reducer
+     ↓
+State 계산
+```
+
+---
+
+## 2. 일반 Action의 동작
+
+일반적인 Action Creator를 생각해 보겠습니다.
+
+```js
+const increment = () => {
+  return {
+    type: "counter/increment"
+  };
+};
+```
+
+컴포넌트에서는 다음처럼 dispatch합니다.
+
+```js
+dispatch(increment());
+```
+
+실제로는 다음 과정이 발생합니다.
+
+```text
+① Action Creator 호출
+        ↓
+② Action Object 생성
+        ↓
+③ dispatch(action)
+        ↓
+④ Reducer 실행
+        ↓
+⑤ State 업데이트
+```
+
+Action 객체는 즉시 만들어지므로 이 과정에는 기다려야 하는 작업이 없습니다.
+
+---
+
+## 3. 비동기 작업은 다르다
+
+상품 목록을 서버에서 가져온다고 생각해 보겠습니다.
+
+```js
 fetch("/api/products");
 ```
 
-는 네트워크라는 외부 세계와 상호작용합니다.
-
-따라서 Side Effect입니다.
-
-반면 Redux Reducer는 개념적으로 **Pure Function**을 기반으로 합니다.
-
-```javascript
-reducer(state, action)
-```
-
-즉:
+`fetch()`를 호출했다고 상품 데이터가 즉시 반환되는 것은 아닙니다.
 
 ```text
-State + Action
-     ↓
-  Reducer
-     ↓
- New State
+Request
+클라이언트 → 서버
+
+        ↓
+
+Pending
+응답 대기
+
+        ↓
+
+Response
+서버 → 클라이언트
 ```
 
-라는 계산에 집중합니다.
-
-따라서 역할을 다음과 같이 분리해야 합니다.
+Promise 관점에서는 다음과 같습니다.
 
 ```text
-Reducer
-=
-State 계산
-
-
-Side Effect
-=
-Reducer 외부에서 처리
+Promise
+   ↓
+Pending
+   ↓
+┌──────────────┐
+↓              ↓
+Fulfilled    Rejected
 ```
 
-그렇다면 새로운 질문이 생깁니다.
-
-> **Reducer 밖의 어디에서 비동기 작업을 처리할까?**
+따라서 비동기 작업에서는 API 요청을 실행하고 결과가 나올 때까지 기다릴 수 있는 별도의 로직이 필요합니다.
 
 ---
 
-# 4. Middleware
+## 4. Middleware
 
-Redux에는 Action이 Reducer로 전달되는 과정에 개입할 수 있는 구조가 있습니다.
+Redux는 이러한 기능을 추가할 수 있도록 Middleware 구조를 제공합니다.
 
-바로 **Middleware**입니다.
-
-기존 흐름:
+Middleware는 `dispatch()` 과정에 개입합니다.
 
 ```text
-dispatch(action)
-      ↓
-Reducer
-```
-
-Middleware가 존재하면:
-
-```text
-dispatch(action)
-      ↓
-Middleware
-      ↓
-Reducer
-```
-
-가 됩니다.
-
-Middleware에서는 다음과 같은 작업을 수행할 수 있습니다.
-
-```text
-Logging
-Async Operation
-Error Handling
-Analytics
-Action 변환
-Side Effect
-```
-
-따라서 구조적으로 보면:
-
-```text
-React Component
-      ↓
 dispatch(...)
       ↓
-┌─────────────────────┐
-│     Middleware      │
-│                     │
-│ Logging             │
-│ Async Operation     │
-│ Side Effect         │
-└──────────┬──────────┘
-           ↓
-        Reducer
-           ↓
-         State
-```
-
-입니다.
-
-핵심 역할을 구분하면:
-
-```text
+Middleware Chain
+      ↓
 Reducer
-=
-State 계산
+```
 
+Middleware가 여러 개라면 다음과 같은 체인이 만들어집니다.
 
+```text
+dispatch(...)
+      ↓
 Middleware
-=
-dispatch와 Reducer 사이에서
-추가적인 로직을 처리
+      ↓
+Middleware
+      ↓
+Middleware
+      ↓
+Reducer
 ```
 
-입니다.
+Middleware는 전달된 값을 검사하거나 로깅하거나 특정 작업을 수행한 뒤 다음 Middleware로 전달할 수 있습니다.
 
 ---
 
-# 5. Redux Thunk
+## 5. Thunk Middleware
 
-Redux에서 가장 대표적인 비동기 Middleware가 **Thunk Middleware**입니다.
+Thunk Middleware도 이러한 Redux Middleware 중 하나입니다.
 
-Redux Toolkit의 `configureStore()`에는 기본적으로 Thunk Middleware가 포함되어 있습니다.
+Thunk Middleware의 중요한 특징은 다음과 같습니다.
 
-따라서 일반적인 Redux Toolkit 프로젝트에서는 별도로 설치하지 않아도 사용할 수 있습니다.
+> dispatch된 값이 함수이면 그 함수를 실행합니다.
 
-일반적인 Redux Action은 객체입니다.
-
-```javascript
-{
-    type: "counter/increment"
-}
-```
-
-따라서 일반적인 dispatch는:
+일반 Action 객체라면:
 
 ```text
-dispatch(
-    Action Object
-)
-```
-
-입니다.
-
-그런데 Thunk Middleware가 존재하면 **함수도 dispatch할 수 있습니다.**
-
-```text
-dispatch(
-    Function
-)
-```
-
-이 함수가 **Thunk Function**입니다.
-
----
-
-# 6. Thunk Function이란?
-
-Redux에서 Thunk는 일반적으로 다음 형태를 가집니다.
-
-```javascript
-function fetchProducts() {
-
-    return async function (
-        dispatch,
-        getState
-    ) {
-
-        // asynchronous operation
-    };
-}
-```
-
-Arrow Function으로 작성하면:
-
-```javascript
-const fetchProducts = () =>
-    async (dispatch, getState) => {
-
-        // asynchronous operation
-    };
-```
-
-즉 일반 Action과 형태부터 다릅니다.
-
-```text
-일반 Action
-
-{
-    type: "..."
-}
-```
-
-반면:
-
-```text
-Thunk
-
-function(dispatch, getState) {
-    ...
-}
-```
-
-입니다.
-
----
-
-# 7. Thunk Middleware는 무엇을 하는가?
-
-다음 코드가 실행되었다고 생각해봅시다.
-
-```javascript
-dispatch(fetchProducts());
-```
-
-먼저:
-
-```javascript
-fetchProducts()
-```
-
-가 실행됩니다.
-
-그리고 다음과 같은 Thunk Function을 반환합니다.
-
-```javascript
-async (dispatch, getState) => {
-    ...
-}
-```
-
-결국 실제 형태는:
-
-```text
-dispatch(
-    async function(...)
-)
-```
-
-이 됩니다.
-
-Thunk Middleware는 dispatch된 값을 검사합니다.
-
-```text
-dispatch(value)
+dispatch(Action)
       ↓
 Thunk Middleware
       ↓
-함수인가?
-  ↙       ↘
-YES       NO
- ↓         ↓
-실행      next(action)
+Reducer
 ```
 
-함수라면 개념적으로:
+함수가 들어오면:
 
-```javascript
-thunkFunction(dispatch, getState);
+```text
+dispatch(Thunk Function)
+      ↓
+Thunk Middleware
+      ↓
+Thunk Function 실행
+```
+
+따라서 Redux에서 비동기 작업을 수행할 공간을 만들 수 있습니다.
+
+---
+
+## 6. Thunk Function
+
+Thunk는 `dispatch`할 수 있는 함수입니다.
+
+대표적인 형태는 다음과 같습니다.
+
+```js
+const fetchProducts = () => {
+  return async (dispatch, getState) => {
+    // 비동기 작업
+  };
+};
+```
+
+외부에서는:
+
+```js
+dispatch(fetchProducts());
 ```
 
 를 실행합니다.
 
-그래서 Thunk 안에서는:
-
-```javascript
-dispatch(...)
-```
-
-를 다시 사용할 수 있고,
-
-```javascript
-getState()
-```
-
-를 통해 현재 Redux State도 읽을 수 있습니다.
-
----
-
-# 8. 일반 Action과 Thunk의 차이
-
-일반 Action:
+`fetchProducts()`의 반환값은 Action 객체가 아니라 함수입니다.
 
 ```text
-Action Object
-     ↓
-dispatch
-     ↓
-Middleware
-     ↓
-Reducer
-     ↓
-State
-```
-
-Thunk:
-
-```text
-Thunk Function
-      ↓
-dispatch
-      ↓
-Thunk Middleware
-      ↓
-Thunk 실행
-      ↓
-Async Operation
-      ↓
-dispatch(Action)
-      ↓
-Reducer
-      ↓
-State
-```
-
-여기서 매우 중요한 점이 있습니다.
-
-> **Thunk가 State를 직접 변경하는 것이 아닙니다.**
-
-Thunk는 비동기 작업을 수행하고 **Action을 dispatch**합니다.
-
-State 변경은 여전히 Reducer가 담당합니다.
-
-```text
-Thunk
-  ↓
-Side Effect
-  ↓
-dispatch(Action)
-  ↓
-Reducer
-  ↓
-State
-```
-
-이 원칙은 Redux에서 매우 중요합니다.
-
----
-
-# 9. 직접 Thunk 작성하기
-
-상품 목록을 가져오는 기능을 만들어봅시다.
-
-먼저 State를 다음과 같이 구성합니다.
-
-```javascript
-const initialState = {
-    items: [],
-    loading: false,
-    error: null
-};
-```
-
-비동기 요청에는 일반적으로 세 가지 결과가 필요합니다.
-
-```text
-요청 시작
-요청 성공
-요청 실패
-```
-
-따라서 Slice에 다음 Reducer를 정의할 수 있습니다.
-
-```javascript
-const productSlice = createSlice({
-    name: "products",
-
-    initialState,
-
-    reducers: {
-        fetchStart(state) {
-            state.loading = true;
-            state.error = null;
-        },
-
-        fetchSuccess(state, action) {
-            state.loading = false;
-            state.items = action.payload;
-        },
-
-        fetchFailure(state, action) {
-            state.loading = false;
-            state.error = action.payload;
-        }
-    }
-});
-```
-
-Action Creator를 꺼냅니다.
-
-```javascript
-export const {
-    fetchStart,
-    fetchSuccess,
-    fetchFailure
-} = productSlice.actions;
-```
-
----
-
-# 10. 직접 작성한 Thunk
-
-이제 실제 API Request를 수행하는 Thunk를 작성합니다.
-
-```javascript
-export const fetchProducts = () => {
-
-    return async (dispatch) => {
-
-        dispatch(fetchStart());
-
-        try {
-            const response =
-                await fetch("/api/products");
-
-            if (!response.ok) {
-                throw new Error(
-                    "Request failed"
-                );
-            }
-
-            const products =
-                await response.json();
-
-            dispatch(
-                fetchSuccess(products)
-            );
-
-        } catch (error) {
-
-            dispatch(
-                fetchFailure(error.message)
-            );
-        }
-    };
-};
-```
-
-React Component에서는:
-
-```javascript
-dispatch(fetchProducts());
-```
-
-로 실행합니다.
-
----
-
-# 11. 직접 작성한 Thunk의 전체 실행 흐름
-
-이 코드는 다음과 같이 동작합니다.
-
-```text
-React Component
-      ↓
 fetchProducts()
       ↓
-Thunk Function 반환
+Thunk Function
       ↓
 dispatch(thunk)
       ↓
 Thunk Middleware
       ↓
 Thunk Function 실행
-      ↓
-dispatch(fetchStart())
-      ↓
-Reducer
-      ↓
-loading = true
-      ↓
-fetch("/api/products")
-      ↓
-Promise Pending
-      ↓
-Server Response
-      ↓
-response.json()
-      ↓
-Promise Fulfilled
-      ↓
-dispatch(fetchSuccess(products))
-      ↓
-Reducer
-      ↓
-items = products
-loading = false
 ```
 
-실패하면:
+---
+
+## 7. dispatch와 getState
+
+Thunk Function에는 중요한 두 아규먼트가 전달됩니다.
+
+```js
+(dispatch, getState) => {
+  // ...
+}
+```
+
+`dispatch`는 새로운 Action이나 Thunk를 Redux에 전달할 때 사용합니다.
+
+```js
+dispatch(fetchSuccess(products));
+```
+
+`getState`는 현재 Redux Store의 State를 읽을 때 사용합니다.
+
+```js
+const state = getState();
+```
+
+예를 들어 인증 토큰이 Redux에 저장되어 있다면:
+
+```js
+const fetchProducts = () => {
+  return async (dispatch, getState) => {
+    const state = getState();
+    const token = state.auth.token;
+
+    const response = await fetch("/api/products", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const products = await response.json();
+
+    dispatch(fetchSuccess(products));
+  };
+};
+```
+
+따라서 두 함수의 역할은 다음과 같이 구분할 수 있습니다.
+
+| 함수           | 역할                 |
+| ------------ | ------------------ |
+| `dispatch()` | Action 또는 Thunk 전달 |
+| `getState()` | 현재 Redux State 조회  |
+
+중요한 점은 Thunk가 직접 State를 변경하지 않는다는 것입니다.
+
+```text
+Thunk
+ ↓
+비동기 작업
+ ↓
+dispatch(Action)
+ ↓
+Reducer
+ ↓
+State 변경
+```
+
+---
+
+# PART 4-2. Thunk의 실제 동작
+
+## 직접 작성한 Thunk + Promise
+
+이제 실제 Thunk를 작성해 보겠습니다.
+
+상품 목록을 서버에서 가져온다고 가정합니다.
+
+먼저 세 가지 Action이 있다고 하겠습니다.
+
+```text
+fetchStart()
+fetchSuccess(products)
+fetchFailure(error)
+```
+
+각 Action의 의미는 다음과 같습니다.
+
+```text
+fetchStart
+→ 요청 시작
+
+fetchSuccess
+→ 요청 성공
+
+fetchFailure
+→ 요청 실패
+```
+
+---
+
+## 1. 직접 작성한 Thunk
+
+```js
+export const fetchProducts = () => {
+  return async (dispatch, getState) => {
+    dispatch(fetchStart());
+
+    try {
+      const response = await fetch("/api/products");
+
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
+
+      const products = await response.json();
+
+      dispatch(fetchSuccess(products));
+    } catch (error) {
+      dispatch(fetchFailure(error.message));
+    }
+  };
+};
+```
+
+컴포넌트에서는 다음과 같이 실행할 수 있습니다.
+
+```js
+dispatch(fetchProducts());
+```
+
+---
+
+## 2. 실제로 무엇이 일어나는가?
+
+먼저:
+
+```js
+fetchProducts()
+```
+
+가 호출됩니다.
+
+이 함수는 다음 함수를 반환합니다.
+
+```js
+async (dispatch, getState) => {
+  // ...
+}
+```
+
+따라서:
+
+```js
+dispatch(fetchProducts());
+```
+
+는 사실상 Thunk Function을 dispatch하는 것입니다.
+
+```text
+dispatch(Thunk Function)
+        ↓
+Thunk Middleware
+        ↓
+Thunk Function 실행
+```
+
+---
+
+## 3. 요청 시작
+
+Thunk가 실행되면 가장 먼저:
+
+```js
+dispatch(fetchStart());
+```
+
+가 실행됩니다.
+
+`fetchStart()`는 일반 Action을 반환합니다.
+
+따라서:
+
+```text
+dispatch(fetchStart())
+        ↓
+Reducer
+        ↓
+loading = true
+error = null
+```
+
+가 됩니다.
+
+여기서 중요한 사실이 하나 있습니다.
+
+> 비동기 작업을 수행하는 동안에도 실제 Redux State 변경은 일반 Action과 Reducer를 통해 이루어집니다.
+
+---
+
+## 4. API Request
+
+다음 코드가 실행됩니다.
+
+```js
+const response = await fetch("/api/products");
+```
+
+이 시점에서 Promise는 Pending 상태입니다.
 
 ```text
 fetch()
    ↓
-Error
+Promise Pending
    ↓
-catch
+서버 응답 대기
+```
+
+서버의 응답이 도착하면 `await` 다음 코드로 진행합니다.
+
+---
+
+## 5. HTTP 오류 처리
+
+여기서 `fetch()`의 중요한 특성을 알아야 합니다.
+
+HTTP `404`, `500` 등의 응답이 왔다고 해서 `fetch()` Promise가 자동으로 reject되는 것은 아닙니다.
+
+서버로부터 HTTP Response를 정상적으로 받았다면 Promise는 일반적으로 fulfilled됩니다.
+
+따라서 직접 확인해야 합니다.
+
+```js
+if (!response.ok) {
+  throw new Error("Request failed");
+}
+```
+
+그러면 `catch`로 이동합니다.
+
+```text
+response.ok === false
+        ↓
+throw Error
+        ↓
+catch(error)
+        ↓
+dispatch(fetchFailure(...))
+```
+
+반대로 네트워크 자체에 문제가 발생하면 `fetch()` Promise 자체가 reject될 수 있으며 이 경우에도 `catch`로 이동합니다.
+
+---
+
+## 6. JSON 파싱도 비동기 작업이다
+
+다음 코드도 Promise를 반환합니다.
+
+```js
+const products = await response.json();
+```
+
+따라서 개념적으로는:
+
+```text
+fetch()
+ ↓
+Promise Pending
+ ↓
+Response
+ ↓
+response.json()
+ ↓
+두 번째 Promise Pending
+ ↓
+JSON Parsing 완료
+ ↓
+products
+```
+
+의 과정입니다.
+
+---
+
+## 7. 성공
+
+성공하면:
+
+```js
+dispatch(fetchSuccess(products));
+```
+
+를 실행합니다.
+
+그러면:
+
+```text
+fetchSuccess(products)
+        ↓
+Action Object
+        ↓
+dispatch(Action)
+        ↓
+Reducer
+        ↓
+items = products
+loading = false
+```
+
+가 됩니다.
+
+---
+
+## 8. 실패
+
+실패하면:
+
+```js
+catch (error) {
+  dispatch(fetchFailure(error.message));
+}
+```
+
+가 실행됩니다.
+
+```text
+오류 발생
    ↓
-dispatch(fetchFailure(error))
+catch(error)
+   ↓
+dispatch(fetchFailure(...))
    ↓
 Reducer
    ↓
@@ -712,169 +627,126 @@ error 저장
 loading = false
 ```
 
-가 됩니다.
-
 ---
 
-# 12. Promise와 Redux 비동기 State
+## 9. Promise와 Redux State는 같은 것이 아니다
 
-여기서 JavaScript Promise와 Redux State가 연결됩니다.
+여기서 중요한 개념이 있습니다.
 
-Promise는 다음 세 가지 상태를 가집니다.
-
-```text
-Promise
-│
-├── Pending
-├── Fulfilled
-└── Rejected
-```
-
-Redux의 비동기 요청도 같은 구조로 생각할 수 있습니다.
+Promise State:
 
 ```text
-Promise State        Redux State
-
-Pending        →     loading = true
-
-Fulfilled      →     data 저장
-
-Rejected       →     error 저장
+Pending
+Fulfilled
+Rejected
 ```
 
-즉:
+Redux State:
 
-```text
-API Request
-     ↓
-  Pending
-   ↙   ↘
-Success Failure
-  ↓      ↓
-Fulfilled Rejected
-```
-
-라는 구조입니다.
-
-이 패턴은 거의 모든 API마다 반복됩니다.
-
----
-
-# 13. 직접 Thunk의 문제점
-
-직접 Thunk를 작성하는 방식은 정상적으로 동작합니다.
-
-하지만 반복 코드가 많습니다.
-
-```javascript
-dispatch(fetchStart());
-
-try {
-
-    const response =
-        await fetch(...);
-
-    const data =
-        await response.json();
-
-    dispatch(fetchSuccess(data));
-
-} catch (error) {
-
-    dispatch(
-        fetchFailure(error.message)
-    );
+```js
+{
+  loading: false,
+  data: [],
+  error: null
 }
 ```
 
-API가 증가하면:
+둘은 서로 다른 상태입니다.
+
+Promise가 Redux State를 직접 변경하지 않습니다.
+
+중간에 Thunk와 Action이 존재합니다.
 
 ```text
-Products API
-    ↓
-start / success / failure
-
-Users API
-    ↓
-start / success / failure
-
-Orders API
-    ↓
-start / success / failure
+Promise 결과
+     ↓
+Thunk
+     ↓
+dispatch(Action)
+     ↓
+Reducer
+     ↓
+Redux State
 ```
 
-와 같은 패턴이 계속 반복됩니다.
+따라서 다음과 같이 이해하는 것이 정확합니다.
 
-Redux Toolkit은 이 반복적인 비동기 Action 처리 패턴을 자동화하는 API를 제공합니다.
+```text
+요청 시작
+→ dispatch(fetchStart())
 
-바로:
+요청 성공
+→ dispatch(fetchSuccess(data))
 
-```javascript
-createAsyncThunk()
+요청 실패
+→ dispatch(fetchFailure(error))
 ```
-
-입니다.
 
 ---
 
-# 14. `createAsyncThunk()`
 
-`createAsyncThunk()`는 **Promise 기반 비동기 작업을 Redux의 Action 흐름과 연결하기 위한 Redux Toolkit API**입니다.
+# PART 4-3. createAsyncThunk() + extraReducers
 
-기본 구조는:
+직접 Thunk를 작성하면 원리를 이해하기에는 좋지만 반복되는 코드가 많습니다.
 
-```javascript
-createAsyncThunk(
-    "actionTypePrefix",
+앞의 코드에서는 우리가 직접:
 
-    async () => {
-        // asynchronous operation
+```js
+dispatch(fetchStart());
+dispatch(fetchSuccess(products));
+dispatch(fetchFailure(error));
+```
+
+를 작성했습니다.
+
+Redux Toolkit은 이러한 전형적인 비동기 흐름을 자동화하는 `createAsyncThunk()`를 제공합니다.
+
+---
+
+# 1. createAsyncThunk()
+
+기본 구조는 다음과 같습니다.
+
+```js
+export const fetchProducts = createAsyncThunk(
+  "products/fetchProducts",
+  async (_, thunkAPI) => {
+    const response = await fetch("/api/products");
+
+    if (!response.ok) {
+      return thunkAPI.rejectWithValue("요청 실패");
     }
+
+    return response.json();
+  }
 );
 ```
 
-예:
+첫 번째 아규먼트:
 
-```javascript
-import {
-    createAsyncThunk
-} from "@reduxjs/toolkit";
-
-export const fetchProducts =
-    createAsyncThunk(
-        "products/fetchProducts",
-
-        async () => {
-
-            const response =
-                await fetch(
-                    "/api/products"
-                );
-
-            if (!response.ok) {
-                throw new Error(
-                    "Failed to fetch products"
-                );
-            }
-
-            return response.json();
-        }
-    );
+```js
+"products/fetchProducts"
 ```
 
-사용할 때는:
+는 **Action Type Prefix**입니다.
 
-```javascript
-dispatch(fetchProducts());
+두 번째 아규먼트:
+
+```js
+async (_, thunkAPI) => {
+  // ...
+}
 ```
 
-라고 작성합니다.
+는 **Payload Creator**입니다.
+
+실제 비동기 작업을 수행하는 함수입니다.
 
 ---
 
-# 15. `createAsyncThunk()`는 무엇을 자동화하는가?
+# 2. 자동 생성되는 3가지 Action
 
-`createAsyncThunk()`의 핵심은 비동기 작업의 세 상태를 자동으로 Action으로 표현해준다는 것입니다.
+`createAsyncThunk()`의 핵심은 비동기 작업의 생명주기에 맞춰 세 가지 Action을 자동으로 생성한다는 것입니다.
 
 ```text
 products/fetchProducts/pending
@@ -884,207 +756,269 @@ products/fetchProducts/fulfilled
 products/fetchProducts/rejected
 ```
 
-즉:
+따라서 직접:
 
-```text
-createAsyncThunk()
-       ↓
-Payload Creator 실행
-       ↓
-Promise
-       ↓
-┌───────────────┐
-│               │
-↓               ↓
-Fulfilled     Rejected
+```js
+fetchStart
+fetchSuccess
+fetchFailure
 ```
 
-이 과정에서 Redux Toolkit은:
+를 만드는 작업을 상당 부분 자동화할 수 있습니다.
+
+전체적인 관계는 다음과 같습니다.
 
 ```text
-시작
- ↓
-pending Action
-
-성공
- ↓
-fulfilled Action
-
-실패
- ↓
-rejected Action
+dispatch(fetchProducts())
+           ↓
+       pending
+           ↓
+   Payload Creator
+           ↓
+     Promise 결과
+        ↙     ↘
+ fulfilled   rejected
 ```
-
-을 자동으로 dispatch합니다.
 
 ---
 
-# 16. `pending`
+# 3. pending
 
-비동기 작업이 시작되면:
+`dispatch(fetchProducts())`가 실행되면 먼저 `pending` Action이 자동 dispatch됩니다.
 
 ```text
 products/fetchProducts/pending
 ```
 
-Action이 자동으로 dispatch됩니다.
+Reducer에서는 일반적으로:
 
-이때 보통:
-
-```javascript
+```js
 state.loading = true;
 state.error = null;
 ```
 
-로 설정합니다.
+로 처리합니다.
 
 ---
 
-# 17. `fulfilled`
+# 4. fulfilled
 
-Payload Creator가 값을 반환하면:
+Payload Creator가 정상적으로 값을 반환하면:
 
-```javascript
-return products;
+```js
+return data;
 ```
 
-`fulfilled` Action이 자동으로 dispatch됩니다.
+`fulfilled` Action이 자동 dispatch됩니다.
 
-개념적으로:
+반환값은:
 
-```javascript
-{
-    type:
-        "products/fetchProducts/fulfilled",
+```js
+action.payload
+```
 
-    payload: products
-}
+에 들어갑니다.
+
+즉:
+
+```text
+return data
+    ↓
+fulfilled Action
+    ↓
+action.payload = data
 ```
 
 입니다.
 
-따라서:
-
-```javascript
-action.payload
-```
-
-를 통해 서버 데이터를 받을 수 있습니다.
-
 ---
 
-# 18. `rejected`
+# 5. rejected
 
-비동기 작업이 실패하면:
+실패 처리에는 중요한 두 가지 경우가 있습니다.
 
-```text
-products/fetchProducts/rejected
+### rejectWithValue()
+
+```js
+return thunkAPI.rejectWithValue(data);
 ```
 
-Action이 dispatch됩니다.
+를 사용하면:
 
-일반적인 예외 정보는:
+```text
+rejected Action
+      ↓
+action.payload = data
+```
 
-```javascript
+가 됩니다.
+
+서버가 전달한 에러 응답 등을 애플리케이션의 실패 데이터로 전달할 때 유용합니다.
+
+### throw
+
+반대로:
+
+```js
+throw new Error("Network Error");
+```
+
+처럼 예외를 발생시키면 주로:
+
+```text
+rejected Action
+      ↓
 action.error
 ```
 
-를 통해 확인할 수 있습니다.
+를 통해 오류 정보가 전달됩니다.
 
----
-
-# 19. `createAsyncThunk()` 전체 흐름
-
-이 부분은 PART 4에서 가장 중요한 흐름입니다.
+따라서:
 
 ```text
-dispatch(fetchProducts())
-          ↓
-fetchProducts()
-          ↓
-Thunk 생성
-          ↓
-Thunk Middleware
-          ↓
-pending Action
-          ↓
-Reducer
-          ↓
-loading = true
-          ↓
-Payload Creator 실행
-          ↓
-fetch()
-          ↓
-Promise
-      ┌───┴───┐
-      ↓       ↓
- Fulfilled  Rejected
-      ↓       ↓
-fulfilled  rejected
- Action     Action
-```
-
-여기서 중요한 것은:
-
-> **`createAsyncThunk()`가 Promise의 상태를 Redux Action으로 연결해준다.**
-
-는 것입니다.
-
----
-
-# 20. `extraReducers`
-
-이제 자동 생성된:
-
-```text
-pending
+정상 return
+     ↓
+action.payload
+     ↓
 fulfilled
+
+
+rejectWithValue(value)
+     ↓
+action.payload
+     ↓
+rejected
+
+
+throw Error
+     ↓
+action.error
+     ↓
 rejected
 ```
 
-Action을 처리해야 합니다.
-
-`createSlice()`의 `reducers`는 Slice가 **직접 생성하는 Action과 Reducer**를 정의합니다.
-
-```javascript
-reducers: {
-    clearProducts(state) {
-        state.items = [];
-    }
-}
-```
-
-이 경우:
-
-```javascript
-clearProducts()
-```
-
-라는 Action Creator도 생성됩니다.
-
-반면 `createAsyncThunk()`가 만든 Action은 Slice의 `reducers`가 직접 만든 Action이 아닙니다.
-
-이런 Action에 반응하기 위해 `extraReducers`를 사용할 수 있습니다.
+로 구분할 수 있습니다.
 
 ---
 
-# 21. `reducers`와 `extraReducers`
+# 6. thunkAPI란?
 
-둘의 차이는 다음처럼 기억하면 됩니다.
+Payload Creator의 두 번째 파라미터로 전달되는:
 
-```text
-reducers
-=
-이 Slice가 Action을 직접 정의하고 생성
-
-
-extraReducers
-=
-다른 곳에서 생성된 Action에 반응
+```js
+thunkAPI
 ```
 
-대표적인 `extraReducers` 대상이:
+는 Redux Toolkit이 제공하는 객체입니다.
+
+실무에서 특히 중요한 기능은 다음 세 가지입니다.
+
+| 기능                           | 역할                                  |
+| ---------------------------- | ----------------------------------- |
+| `thunkAPI.dispatch()`        | 다른 Action 또는 Thunk dispatch         |
+| `thunkAPI.getState()`        | 현재 Redux Store State 조회             |
+| `thunkAPI.rejectWithValue()` | 사용자 정의 실패 데이터를 `action.payload`로 전달 |
+
+예를 들어:
+
+```js
+async (_, thunkAPI) => {
+  const state = thunkAPI.getState();
+
+  thunkAPI.dispatch(logRequest());
+
+  const response = await fetch("/api/products");
+
+  if (!response.ok) {
+    return thunkAPI.rejectWithValue("요청 실패");
+  }
+
+  return response.json();
+}
+```
+
+앞에서 직접 작성한 Thunk의:
+
+```js
+(dispatch, getState)
+```
+
+와 연결해서 이해하면 됩니다.
+
+---
+
+# 7. extraReducers
+
+`createAsyncThunk()`가 Action을 자동으로 만들어도 이 Action을 받았을 때 State를 어떻게 변경할지는 Reducer가 정의해야 합니다.
+
+여기서 `extraReducers`를 사용합니다.
+
+```js
+extraReducers: (builder) => {
+  builder
+    .addCase(fetchProducts.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    })
+
+    .addCase(fetchProducts.fulfilled, (state, action) => {
+      state.loading = false;
+      state.items = action.payload;
+    })
+
+    .addCase(fetchProducts.rejected, (state, action) => {
+      state.loading = false;
+      state.error =
+        action.payload || action.error.message;
+    });
+}
+```
+
+흐름은 다음과 같습니다.
+
+```text
+pending
+   ↓
+extraReducers
+   ↓
+loading = true
+
+
+fulfilled
+   ↓
+extraReducers
+   ↓
+items = action.payload
+loading = false
+
+
+rejected
+   ↓
+extraReducers
+   ↓
+error 저장
+loading = false
+```
+
+---
+
+# 8. reducers와 extraReducers
+
+두 개의 차이를 이해해야 합니다.
+
+`reducers`는 해당 Slice가 직접 정의하고 생성하는 Action을 처리합니다.
+
+```js
+reducers: {
+  clearProducts(state) {
+    state.items = [];
+  }
+}
+```
+
+반면 `extraReducers`는 다른 곳에서 만들어진 Action에도 반응할 수 있습니다.
+
+대표적인 예가:
 
 ```text
 fetchProducts.pending
@@ -1094,768 +1028,569 @@ fetchProducts.rejected
 
 입니다.
 
+즉:
+
+```text
+reducers
+→ 이 Slice에서 정의한 Action
+
+
+extraReducers
+→ 외부에서 생성된 Action에도 반응
+```
+
+이라고 이해하면 됩니다.
+
 ---
 
-# 22. `builder.addCase()`
+# 9. dispatch(fetchProducts())의 반환값
 
-`builder.addCase()`는 특정 Action이 발생했을 때 실행할 Reducer 로직을 등록합니다.
+여기에는 실무에서 매우 중요한 특징이 있습니다.
 
-```javascript
-extraReducers: builder => {
+```js
+const result = await dispatch(fetchProducts());
+```
 
-    builder
-        .addCase(
-            fetchProducts.pending,
-            state => {
-                state.loading = true;
-                state.error = null;
-            }
-        )
+`createAsyncThunk`로 생성한 Thunk를 dispatch하면 결과 Promise는 일반적으로 **reject되지 않고 resolve**되며, 최종 `fulfilled` 또는 `rejected` Action 객체를 결과로 제공합니다.
 
-        .addCase(
-            fetchProducts.fulfilled,
-            (state, action) => {
-                state.loading = false;
-                state.items =
-                    action.payload;
-            }
-        )
+따라서 다음 코드의 `catch`가 단순히 `rejected Action` 때문에 실행되는 것은 아닙니다.
 
-        .addCase(
-            fetchProducts.rejected,
-            (state, action) => {
-                state.loading = false;
-                state.error =
-                    action.error.message;
-            }
-        );
+```js
+try {
+  await dispatch(fetchProducts());
+} catch (error) {
+  // rejected Action이라고 자동으로 여기로 오지 않음
 }
 ```
 
-결과적으로:
+---
+
+# 10. unwrap()
+
+컴포넌트에서 일반적인 Promise처럼 성공과 실패를 처리하고 싶다면 `.unwrap()`을 사용할 수 있습니다.
+
+```js
+try {
+  const products =
+    await dispatch(fetchProducts()).unwrap();
+
+  console.log(products);
+} catch (error) {
+  console.error(error);
+}
+```
+
+성공하면 fulfilled Action의 payload를 반환합니다.
 
 ```text
-pending
-   ↓
-loading = true
-
-
 fulfilled
    ↓
-loading = false
-items = action.payload
+unwrap()
+   ↓
+action.payload 반환
+```
 
+실패하면 오류 값을 throw합니다.
 
+```text
 rejected
    ↓
-loading = false
-error = ...
+unwrap()
+   ↓
+rejectWithValue의 payload
+또는 error
+   ↓
+throw
+   ↓
+catch
 ```
 
-가 됩니다.
+따라서 컴포넌트에서 요청 성공 후 페이지 이동 등의 명령형 로직이 필요할 때 유용합니다.
 
 ---
 
-# 23. 전체 Product Slice
+# 11. createAsyncThunk 전체 실행 흐름
 
-```javascript
-import {
-    createAsyncThunk,
-    createSlice
-} from "@reduxjs/toolkit";
+지금까지를 하나로 연결해 보겠습니다.
 
-
-export const fetchProducts =
-    createAsyncThunk(
-        "products/fetchProducts",
-
-        async () => {
-
-            const response =
-                await fetch(
-                    "/api/products"
-                );
-
-            if (!response.ok) {
-                throw new Error(
-                    "Failed to fetch products"
-                );
-            }
-
-            return response.json();
-        }
-    );
-
-
-const productSlice = createSlice({
-    name: "products",
-
-    initialState: {
-        items: [],
-        loading: false,
-        error: null
-    },
-
-    reducers: {},
-
-    extraReducers: builder => {
-
-        builder
-            .addCase(
-                fetchProducts.pending,
-                state => {
-                    state.loading = true;
-                    state.error = null;
-                }
-            )
-
-            .addCase(
-                fetchProducts.fulfilled,
-                (state, action) => {
-                    state.loading = false;
-                    state.items =
-                        action.payload;
-                }
-            )
-
-            .addCase(
-                fetchProducts.rejected,
-                (state, action) => {
-                    state.loading = false;
-                    state.error =
-                        action.error.message;
-                }
-            );
-    }
-});
-
-
-export default productSlice.reducer;
+```text
+① dispatch(fetchProducts())
+           ↓
+② Thunk 생성
+           ↓
+③ Thunk Middleware
+           ↓
+④ pending Action dispatch
+           ↓
+⑤ Payload Creator 실행
+           ↓
+⑥ Promise Pending
+           ↓
+⑦ Promise 결과
+        ↙       ↘
+      성공       실패
+       ↓          ↓
+⑧-A fulfilled  ⑧-B rejected
+       ↘          ↙
+        ⑨ Reducer
+            ↓
+       ⑩ New State
 ```
+
+`fulfilled`와 `rejected`는 순서대로 실행되는 것이 아닙니다.
+
+**성공하면 fulfilled, 실패하면 rejected 중 하나가 선택됩니다.**
+
 
 ---
 
-# 24. React Component에서 사용하기
+# PART 4-4. React에서의 전체 실행 흐름
 
-```jsx
-import { useEffect } from "react";
+이제 마지막으로 지금까지 배운 내용을 React와 연결해 보겠습니다.
 
-import {
-    useDispatch,
-    useSelector
-} from "react-redux";
+상품 목록 컴포넌트가 있다고 하겠습니다.
 
-import {
-    fetchProducts
-} from "./productSlice";
-
-
+```js
 function ProductList() {
+  const dispatch = useDispatch();
 
-    const dispatch = useDispatch();
+  const { items, loading, error } = useSelector(
+    state => state.products
+  );
 
-    const {
-        items,
-        loading,
-        error
-    } = useSelector(
-        state => state.products
-    );
+  useEffect(() => {
+    dispatch(fetchProducts());
+  }, [dispatch]);
 
-    useEffect(() => {
-        dispatch(fetchProducts());
-    }, [dispatch]);
+  if (loading) {
+    return <p>Loading...</p>;
+  }
 
+  if (error) {
+    return <p>{error}</p>;
+  }
 
-    if (loading) {
-        return <p>Loading...</p>;
-    }
-
-    if (error) {
-        return <p>{error}</p>;
-    }
-
-    return (
-        <ul>
-            {items.map(product => (
-                <li key={product.id}>
-                    {product.name}
-                </li>
-            ))}
-        </ul>
-    );
-}
-
-export default ProductList;
-```
-
-Component의 실행 과정은 다음과 같습니다.
-
-```text
-ProductList Render
-       ↓
-useEffect()
-       ↓
-dispatch(fetchProducts())
-       ↓
-pending
-       ↓
-loading = true
-       ↓
-Re-render
-       ↓
-Loading...
-       ↓
-Server Response
-       ↓
-fulfilled
-       ↓
-items = products
-loading = false
-       ↓
-Re-render
-       ↓
-상품 목록 표시
-```
-
----
-
-# 25. `createAsyncThunk()`에 아규먼트 전달하기
-
-특정 상품 하나를 조회한다고 생각해봅시다.
-
-```text
-GET /api/products/10
-```
-
-`createAsyncThunk()`의 Payload Creator에 값을 전달할 수 있습니다.
-
-```javascript
-export const fetchProduct =
-    createAsyncThunk(
-        "products/fetchProduct",
-
-        async (productId) => {
-
-            const response =
-                await fetch(
-                    `/api/products/${productId}`
-                );
-
-            return response.json();
-        }
-    );
-```
-
-호출:
-
-```javascript
-dispatch(fetchProduct(10));
-```
-
-흐름은:
-
-```text
-fetchProduct(10)
-      ↓
-productId = 10
-      ↓
-Payload Creator
-      ↓
-GET /api/products/10
-```
-
-입니다.
-
-여기서 `10`은 `fetchProduct()` 호출 시 전달한 **아규먼트**이고, Payload Creator에서는 `productId`라는 **파라미터**로 받습니다.
-
----
-
-# 26. Payload Creator와 `thunkAPI`
-
-`createAsyncThunk()`의 두 번째 아규먼트로 전달하는 함수를 **Payload Creator**라고 합니다.
-
-```javascript
-createAsyncThunk(
-    "products/fetchProduct",
-
-    async (productId, thunkAPI) => {
-        // ...
-    }
-);
-```
-
-Payload Creator는 일반적으로 Promise를 반환합니다.
-
-성공적으로 반환한 값은:
-
-```javascript
-return product;
-```
-
-`fulfilled` Action의:
-
-```javascript
-action.payload
-```
-
-가 됩니다.
-
-두 번째 파라미터인 `thunkAPI`를 통해서는 대표적으로 다음 기능을 사용할 수 있습니다.
-
-```text
-dispatch
-getState
-rejectWithValue
-signal
-requestId
-```
-
-입문 단계에서는 특히:
-
-```text
-dispatch
-getState
-rejectWithValue
-```
-
-를 알아두면 좋습니다.
-
----
-
-# 27. `getState()`
-
-Thunk 내부에서 현재 Redux State가 필요한 경우가 있습니다.
-
-예를 들어 인증 토큰이:
-
-```javascript
-{
-    auth: {
-        token: "..."
-    }
+  return (
+    <ul>
+      {items.map(p => (
+        <li key={p.id}>{p.name}</li>
+      ))}
+    </ul>
+  );
 }
 ```
 
-에 있다면:
-
-```javascript
-const state =
-    thunkAPI.getState();
-
-const token =
-    state.auth.token;
-```
-
-으로 가져올 수 있습니다.
-
-그리고:
-
-```javascript
-await fetch("/api/users/me", {
-    headers: {
-        Authorization:
-            `Bearer ${token}`
-    }
-});
-```
-
-처럼 사용할 수 있습니다.
+이 짧은 코드 뒤에서는 상당히 많은 작업이 일어납니다.
 
 ---
 
-# 28. `rejectWithValue()`
+# 1. 최초 Render
 
-서버가 반환한 오류 데이터를 rejected Action에 직접 전달하고 싶을 수 있습니다.
-
-```javascript
-if (!response.ok) {
-
-    return thunkAPI.rejectWithValue(
-        data
-    );
-}
-```
-
-이 경우 실패 데이터는:
-
-```javascript
-action.payload
-```
-
-에서 확인할 수 있습니다.
-
-반면 일반적인 예외:
-
-```javascript
-throw new Error("Network Error");
-```
-
-의 정보는 일반적으로:
-
-```javascript
-action.error
-```
-
-를 통해 확인합니다.
-
-따라서:
+React가 `ProductList`를 렌더링합니다.
 
 ```text
-throw Error
-    ↓
-action.error
-
-
-rejectWithValue(data)
-    ↓
-action.payload
+ProductList()
+     ↓
+최초 Render
 ```
 
-라고 구분할 수 있습니다.
+아직 서버 데이터가 없을 수 있습니다.
 
 ---
 
-# 29. 비동기 State 설계
+# 2. useEffect 실행
 
-비동기 State는 흔히 다음과 같이 설계할 수 있습니다.
+컴포넌트가 마운트된 후 Effect가 실행됩니다.
 
-```javascript
-{
-    data: null,
-    loading: false,
-    error: null
-}
+```js
+useEffect(() => {
+  dispatch(fetchProducts());
+}, [dispatch]);
 ```
 
-목록이라면:
-
-```javascript
-{
-    items: [],
-    loading: false,
-    error: null
-}
-```
-
-또는 상태를 문자열로 더 명확하게 표현할 수도 있습니다.
-
-```javascript
-{
-    items: [],
-    status: "idle",
-    error: null
-}
-```
-
-상태 흐름:
-
-```text
-idle
- ↓
-loading
- ↓
-┌──────────────┐
-↓              ↓
-succeeded    failed
-```
-
-두 방식 모두 가능하며 애플리케이션의 요구에 따라 선택할 수 있습니다.
+여기서 Redux 비동기 흐름이 시작됩니다.
 
 ---
 
-# 30. `createAsyncThunk()`의 한계와 RTK Query
+# 3. Thunk dispatch
 
-`createAsyncThunk()`는 Redux에서 비동기 로직을 처리하는 강력한 도구입니다.
-
-하지만 서버 데이터가 많아지면 또 다른 문제가 생깁니다.
-
-예를 들어:
-
-```text
-GET /products
-GET /products/10
-POST /products
-PUT /products/10
-DELETE /products/10
-
-GET /users
-GET /orders
+```js
+dispatch(fetchProducts());
 ```
 
-각 서버 데이터마다 다음을 직접 관리해야 할 수 있습니다.
-
-```text
-data
-loading
-error
-
-fetch
-cache
-refetch
-중복 요청
-데이터 만료
-동기화
-```
-
-여기서 **Client State와 Server State**의 차이가 중요해집니다.
-
-```text
-Application State
-│
-├── Client State
-│
-└── Server State
-```
-
-### Client State
-
-클라이언트 애플리케이션 자체가 소유하는 상태입니다.
-
-```text
-Modal 열림 여부
-Sidebar 상태
-선택된 Tab
-검색 조건
-Wizard 단계
-```
-
-이런 상태는 `createSlice()`로 관리하기 좋습니다.
-
-### Server State
-
-원본 데이터가 서버에 존재하는 상태입니다.
-
-```text
-상품
-회원
-게시글
-주문
-댓글
-재고
-```
-
-클라이언트는 서버 데이터의 복사본을 가져와 사용합니다.
-
-```text
-Database / Server
-       ↓
-      HTTP
-       ↓
-     Client
-       ↓
-Cached Server Data
-```
-
-따라서 Server State에는 추가적인 문제가 있습니다.
-
-```text
-Fetching
-Caching
-Synchronization
-Invalidation
-Refetch
-Request Deduplication
-Subscription
-Loading / Error
-```
-
-원문에서도 이 부분이 매우 잘 잡혀 있습니다. Server State를 단순한 `data/loading/error` 문제에서 끝내지 않고 **Caching, Synchronization, Invalidation, Subscription** 문제로 확장한 것이 RTK Query로 넘어가는 좋은 연결점입니다. 
-
----
-
-# 31. 그래서 RTK Query가 필요하다
-
-Redux Toolkit은 Server State의 **Fetching과 Caching을 전문적으로 관리하는 도구**를 제공합니다.
-
-바로 **RTK Query**입니다.
-
-RTK Query는 다음과 같은 문제를 다루도록 설계되어 있습니다.
-
-```text
-API Request
-Loading
-Error
-Cache
-Request Deduplication
-Subscription
-Refetch
-Cache Invalidation
-```
-
-따라서:
-
-```text
-createAsyncThunk
-=
-일반적인 비동기 Redux Logic
-
-
-RTK Query
-=
-Server State Fetching + Caching
-```
-
-정도로 역할을 구분하면 좋습니다.
-
-`createAsyncThunk()`가 무조건 구식이고 RTK Query가 무조건 더 좋은 것은 아닙니다.
-
-복잡한 비동기 Workflow나 Redux State와 긴밀하게 결합된 Business Logic에서는 `createAsyncThunk()`가 적합할 수 있고, 서버 데이터를 가져오고 Cache하고 동기화하는 것이 핵심이라면 RTK Query가 더 적합할 수 있습니다. 원문도 이 역할 차이를 명확하게 구분하고 있습니다. 
-
----
-
-# 32. PART 4 전체 실행 흐름
-
-이번 PART에서 가장 중요하게 기억해야 할 흐름입니다.
+가 실행됩니다.
 
 ```text
 React Component
       ↓
 dispatch(fetchProducts())
       ↓
-fetchProducts()
-      ↓
-Thunk Function 생성
-      ↓
 Thunk Middleware
-      ↓
-pending Action
-      ↓
-Reducer
-      ↓
-loading = true
-      ↓
-Payload Creator
-      ↓
-fetch()
-      ↓
-Promise
-   ┌──┴──┐
-   ↓     ↓
-resolve reject
-   ↓     ↓
-fulfilled rejected
- Action    Action
-   ↓        ↓
-Reducer   Reducer
-   ↓        ↓
- data     error
-   └───┬────┘
-       ↓
-  Redux Store
-       ↓
-  useSelector()
-       ↓
-React Re-render
 ```
 
-이 흐름이 머릿속에 보인다면 Redux의 기본적인 비동기 처리 구조를 이해한 것입니다.
+Thunk Middleware가 Thunk Function을 실행합니다.
 
 ---
 
-# 33. PART 4 핵심 정리
+# 4. pending Action
 
-이번 PART의 개념을 하나의 구조로 연결하면 다음과 같습니다.
+`createAsyncThunk()`는 먼저 `pending` Action을 dispatch합니다.
 
 ```text
-Reducer
-   │
-   │ Side Effect 처리 X
-   ↓
-Middleware
-   ↓
-Thunk Middleware
-   ↓
-Thunk Function
-   ↓
-Async Operation
-   ↓
-Promise
-   │
-   ├── Pending
-   ├── Fulfilled
-   └── Rejected
-   ↓
-createAsyncThunk()
-   ↓
-pending / fulfilled / rejected
-Action 자동 생성
+fetchProducts.pending
+```
+
+`extraReducers`가 이를 처리합니다.
+
+```js
+state.loading = true;
+state.error = null;
+```
+
+Store의 State가 변경됩니다.
+
+---
+
+# 5. React-Redux가 Store 변경을 전달한다
+
+Store가 변경되면 React-Redux의 subscription 구조를 통해 관련 컴포넌트에 업데이트가 전달됩니다.
+
+`useSelector()`는 selector 결과를 기준으로 필요한 리렌더링을 결정합니다.
+
+따라서:
+
+```text
+Redux Store 변경
+      ↓
+React-Redux Subscription
+      ↓
+selector 결과 확인
+      ↓
+관련 컴포넌트 Re-render
+```
+
+가 됩니다.
+
+화면에는:
+
+```text
+Loading...
+```
+
+이 나타납니다.
+
+---
+
+# 6. 서버 응답
+
+그동안 Payload Creator에서는 API 요청이 진행되고 있습니다.
+
+```js
+const response = await fetch("/api/products");
+```
+
+서버 응답이 도착하고 데이터 처리가 성공하면:
+
+```text
+fulfilled Action
+```
+
+이 자동 dispatch됩니다.
+
+---
+
+# 7. fulfilled Action 처리
+
+`extraReducers`가:
+
+```js
+fetchProducts.fulfilled
+```
+
+를 처리합니다.
+
+```js
+state.items = action.payload;
+state.loading = false;
+```
+
+그러면 Redux Store가 다시 변경됩니다.
+
+---
+
+# 8. React 화면 업데이트
+
+React-Redux가 Store 변경을 구독 컴포넌트에 전달하고 selector 결과가 변경되면 `ProductList`가 다시 렌더링됩니다.
+
+```text
+fulfilled
    ↓
 extraReducers
    ↓
-Redux State
+Redux Store
    ↓
-React
+React-Redux Subscription
+   ↓
+useSelector 결과 변경
+   ↓
+Component Re-render
+   ↓
+상품 목록 표시
 ```
 
-각 개념을 한 문장으로 정리하면:
-
-| 개념                   | 역할                                          |
-| -------------------- | ------------------------------------------- |
-| Reducer              | State를 계산한다                                 |
-| Middleware           | dispatch와 Reducer 사이의 처리 과정에 개입한다           |
-| Thunk                | 비동기 로직 등을 담을 수 있는 함수                        |
-| Thunk Middleware     | dispatch된 Thunk Function을 실행한다              |
-| Promise              | 비동기 작업의 Pending/Fulfilled/Rejected 상태를 표현한다 |
-| `createAsyncThunk()` | Promise 기반 비동기 작업과 Redux Action을 연결한다       |
-| `extraReducers`      | Slice 외부에서 만들어진 Action에 반응한다                |
-| RTK Query            | Server State의 Fetching과 Caching을 전문적으로 관리한다 |
+이것이 **React → Redux → 비동기 작업 → Redux → React**의 전체 연결입니다.
 
 ---
 
-# 다음 단계 — PART 5. RTK Query
+# 9. React 18 StrictMode 주의
 
-서버 데이터가 많아지면 단순히 데이터를 가져오는 것만으로 끝나지 않습니다.
+개발 환경에서 React의 `StrictMode`를 사용하면 Effect의 문제를 발견하기 위해 setup/cleanup 사이클이 추가로 실행될 수 있습니다.
 
-```text
-이미 받은 데이터를 다시 요청해야 하는가?
+따라서 다음처럼 Effect에서 직접 요청을 시작하면:
 
-같은 API를 여러 Component가 사용하면?
-
-Cache는 언제 제거할 것인가?
-
-POST 이후 기존 GET 결과는 어떻게 갱신할 것인가?
-
-중복 Request는 어떻게 막을 것인가?
-
-Component가 사라지면 Subscription은 어떻게 할 것인가?
+```js
+useEffect(() => {
+  dispatch(fetchProducts());
+}, [dispatch]);
 ```
 
-바로 이 문제를 해결하기 위해 **RTK Query**가 등장합니다.
+개발 과정에서 동일한 요청이 반복되는 것처럼 보일 수 있습니다.
 
-다음 PART에서는:
+중요한 것은 이것을:
+
+> React에서는 API가 항상 두 번 호출된다.
+
+라고 이해하면 안 된다는 것입니다.
+
+`StrictMode`의 개발 환경 검사와 관련된 동작이며 프로덕션에서 같은 이유로 두 번 실행되는 것은 아닙니다.
+
+하지만 여기서 더 근본적인 문제가 드러납니다.
+
+서버 데이터를 직접 관리하기 시작하면 단순한 API 호출 이외에도 다음 문제들을 고려해야 합니다.
+
+```text
+Caching
+Request Deduplication
+Synchronization
+Cache Invalidation
+Refetch
+Subscription
+Loading / Error
+```
+
+그리고 이것이 **RTK Query가 등장하는 이유**와 연결됩니다.
+
+---
+
+# 10. Client State와 Server State
+
+애플리케이션의 State를 크게 두 종류로 나누어 생각해 볼 수 있습니다.
+
+## Client State
+
+클라이언트 자체가 소유하는 상태입니다.
+
+예:
+
+```text
+모달 열림 여부
+사이드바 상태
+선택된 탭
+검색 조건
+Wizard 단계
+폼 입력값
+```
+
+이러한 State는 UI에서 만들어지고 UI가 직접 관리합니다.
+
+Redux Toolkit에서는 일반적으로:
+
+```js
+createSlice()
+```
+
+로 관리하기 좋습니다.
+
+---
+
+## Server State
+
+서버가 원본을 가지고 있는 데이터입니다.
+
+예:
+
+```text
+상품 목록
+회원 정보
+주문 정보
+게시글
+댓글
+재고 정보
+카테고리 정보
+```
+
+클라이언트에 있는 것은 서버 데이터의 복사본 또는 캐시라고 볼 수 있습니다.
+
+```text
+Database / Server
+       ↕
+      HTTP
+       ↕
+     Client
+       ↓
+Cached Server Data
+```
+
+따라서 Server State는 Client State와 다른 문제가 발생합니다.
+
+---
+
+# 11. Server State가 복잡한 이유
+
+상품 목록 하나를 가져오는 것만 생각하면:
+
+```js
+fetch("/api/products");
+```
+
+로 간단해 보입니다.
+
+하지만 실제 애플리케이션에서는 다음을 관리해야 합니다.
+
+```text
+Fetching
+Caching
+Request Deduplication
+Synchronization
+Cache Invalidation
+Refetch
+Subscription
+Loading
+Error
+```
+
+예를 들어 이미 상품 데이터를 가져왔다면:
+
+> 다시 서버에 요청해야 하는가?
+
+다른 컴포넌트도 같은 데이터를 요청한다면:
+
+> 요청을 두 번 보내야 하는가?
+
+상품을 수정했다면:
+
+> 기존 캐시는 언제 무효화해야 하는가?
+
+사용자가 화면으로 돌아왔다면:
+
+> 서버 데이터를 다시 가져와야 하는가?
+
+이러한 문제까지 모두 직접 처리하면 `createAsyncThunk()` 코드가 빠르게 복잡해질 수 있습니다.
+
+---
+
+# 12. createAsyncThunk가 적합한 경우
+
+그렇다고 `createAsyncThunk()`가 필요 없어지는 것은 아닙니다.
+
+복잡한 비즈니스 로직이나 여러 단계의 비동기 Workflow를 직접 제어해야 할 때 매우 유용합니다.
+
+예를 들어:
+
+```text
+주문 생성
+ ↓
+결제 요청
+ ↓
+결제 성공 확인
+ ↓
+재고 처리
+ ↓
+주문 상태 변경
+ ↓
+페이지 이동
+```
+
+처럼 여러 작업을 순서대로 제어해야 한다면 `createAsyncThunk()`가 적합할 수 있습니다.
+
+---
+
+# 13. Server State와 RTK Query
+
+반대로 핵심 문제가:
+
+```text
+서버 데이터 조회
+캐싱
+동일 요청 중복 방지
+데이터 재사용
+자동 Refetch
+Cache Invalidation
+Subscription
+Loading / Error
+```
+
+이라면 RTK Query가 훨씬 적합합니다.
+
+RTK Query는 Server State 관리에 필요한 기능을 제공합니다.
+
+```text
+Automatic Caching
+
+Request Deduplication
+
+Cache Invalidation
+
+Background Refetch
+
+Subscription Management
+
+Loading / Error Handling
+```
+
+따라서:
 
 ```text
 Client State
-vs
+→ createSlice()
+
+
+복잡한 비동기 Workflow
+→ createAsyncThunk()
+
+
 Server State
-      ↓
-RTK Query
-      ↓
-createApi()
-      ↓
-fetchBaseQuery()
-      ↓
-endpoints
-      ↓
-builder.query()
-builder.mutation()
-      ↓
-Generated Hooks
-      ↓
-Query Cache
-      ↓
-Subscription
-      ↓
-Request Deduplication
-      ↓
-providesTags
-invalidatesTags
-      ↓
-Cache Invalidation
-      ↓
-Automatic Refetch
+→ RTK Query
 ```
 
-의 흐름으로 학습하면 자연스럽습니다.
+라는 큰 그림을 잡을 수 있습니다.
 
+이것은 절대적인 규칙이라기보다 각 도구가 특히 잘 해결하는 문제 영역을 이해하기 위한 구분입니다.
+
+---
+
+
+
+
+# 최종 핵심
+
+PART 4 전체를 한 문장으로 압축하면 다음과 같습니다.
+
+> **Redux에서 Thunk는 Reducer 밖에서 비동기 작업을 수행하고 그 결과를 Action으로 Redux 흐름에 다시 연결하며, `createAsyncThunk()`는 이 패턴을 `pending / fulfilled / rejected` Action으로 자동화하고, Server State 관리가 중심이 되면 RTK Query를 사용할 수 있습니다.**
+
+그리고 반드시 역할을 구분해서 기억해야 합니다.
+
+| 구성 요소              | 핵심 역할                                            |
+| ------------------ | ------------------------------------------------ |
+| `Reducer`          | State 계산                                         |
+| `Middleware`       | dispatch 과정 확장                                   |
+| `Thunk Middleware` | dispatch된 함수 실행                                  |
+| `Thunk Function`   | 비동기 작업과 Side Effect 수행                           |
+| `dispatch`         | Action 또는 Thunk 전달                               |
+| `getState`         | 현재 Redux State 조회                                |
+| `createAsyncThunk` | 비동기 생명주기 Action 자동 생성                            |
+| `extraReducers`    | 외부에서 생성된 Action에 반응하여 State 변경                   |
+| `React-Redux`      | Redux Store와 React 연결                            |
+| `RTK Query`        | Server State fetching/caching/synchronization 관리 |
+
+이 흐름을 이해했다면 다음 **PART 5. RTK Query**에서는 단순히 새로운 API를 배우는 것이 아니라, **PART 4에서 직접 관리했던 Server State 관련 반복 작업을 RTK Query가 어떻게 대신해 주는가**를 중심으로 들어가는 것이 가장 자연스럽습니다.
