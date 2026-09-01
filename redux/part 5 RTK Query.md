@@ -1,2968 +1,2217 @@
-# PART 5. RTK Query
+# RTK Query 완벽 이해
 
-## — Server State Fetching, Caching, Synchronization
+## Redux에서 서버 데이터를 어떻게 관리할 것인가?
 
-RTK Query를 처음 접하면 다음과 같은 용어들이 한꺼번에 등장합니다.
-
-```text
-createApi
-fetchBaseQuery
-Query
-Mutation
-Cache
-Cache Key
-Subscription
-Tag
-Invalidation
-Refetch
-...
-```
-
-하나씩 보면 어려운 개념은 아니지만, 처음부터 내부 구조를 모두 이해하려고 하면 RTK Query가 상당히 복잡하게 느껴질 수 있습니다.
-
-따라서 이번 PART에서는 **사용법부터 시작해서 점차 내부 구조로 들어가는 방식**으로 학습합니다.
+RTK Query는 **Redux Toolkit에 포함된 서버 상태(Server State) 데이터 패칭 및 캐싱 도구**입니다.
 
 ```text
-[1단계: 초급]
-
-fetch + useEffect의 불편함
-        ↓
-RTK Query가 왜 필요한가?
-        ↓
-가장 간단한 Query 사용
-
-
-[2단계: 핵심]
-
-Server State
-        ↓
-Query Cache
-        ↓
-Subscription
-        ↓
-Mutation
-        ↓
-Cache Invalidation
-
-
-[3단계: 내부 원리]
-
-Cache Key
-Request Deduplication
-Cache Lifetime
-Reducer / Middleware
-Refetch
-
-
-[4단계: 실전 / 중급]
-
-Lazy Query
-transformResponse
-injectEndpoints
-Custom baseQuery
-onQueryStarted
-queryFulfilled
-apiSlice.util
-...
+Redux Toolkit
+│
+├─ configureStore
+├─ createSlice
+├─ createAsyncThunk
+│
+└─ RTK Query
+    ├─ createApi
+    ├─ fetchBaseQuery
+    ├─ Query
+    ├─ Mutation
+    ├─ Cache
+    ├─ Subscription
+    ├─ Tag Invalidation
+    └─ React Hooks
 ```
 
-> **처음 읽을 때 모든 것을 암기할 필요는 없습니다.**
->
-> 먼저 **"RTK Query는 왜 필요한가?"**와
-> **"Component가 Server Data를 직접 관리하지 않고 RTK Query의 Cache를 사용한다."**
->
-> 이 두 가지를 이해하는 것이 가장 중요합니다.
+RTK Query를 단순히 다음과 같이 이해해서는 부족합니다.
+
+```text
+RTK Query
+= fetch를 편하게 해주는 도구
+```
+
+더 정확하게는 다음과 같습니다.
+
+```text
+RTK Query
+=
+서버 요청
++ Redux Store 기반 캐시
++ 요청 상태 관리
++ 중복 요청 제거
++ Subscription 관리
++ Cache Lifecycle 관리
++ Cache Invalidation
++ 자동 Re-fetch
++ React Hook 생성
+```
+
+즉 RTK Query의 핵심은 **“서버에서 데이터를 가져오는 것” 자체보다 “가져온 서버 데이터를 어떻게 캐시하고 동기화할 것인가”** 에 있습니다.
 
 ---
 
-# CHAPTER 1. 왜 RTK Query가 필요한가?
+# 1. Client State와 Server State
 
-## 1. 우리가 지금까지 Server Data를 가져오던 방법
+RTK Query를 이해하려면 먼저 Redux가 다루는 상태를 구분할 필요가 있습니다.
 
-React 애플리케이션에서 상품 목록을 Server로부터 가져온다고 생각해봅시다.
+### Client State
 
-가장 직접적인 방법은 `fetch()`와 `useEffect()`를 사용하는 것입니다.
-
-```jsx
-import { useEffect, useState } from "react";
-
-function ProductList() {
-
-    const [products, setProducts] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
-
-    useEffect(() => {
-
-        const fetchProducts = async () => {
-
-            try {
-
-                setIsLoading(true);
-
-                const response =
-                    await fetch("/api/products");
-
-                const data =
-                    await response.json();
-
-                setProducts(data);
-
-            } catch (error) {
-
-                setError(error);
-
-            } finally {
-
-                setIsLoading(false);
-            }
-        };
-
-        fetchProducts();
-
-    }, []);
-
-    // ...
-}
-```
-
-상품 목록 하나를 가져오기 위해 벌써 다음 상태들을 직접 관리하고 있습니다.
+애플리케이션 내부에서 만들어지고 관리되는 상태입니다.
 
 ```text
-products
-isLoading
-error
+로그인 모달 열림 여부
+현재 선택한 탭
+사이드바 열림 여부
+테마
+로컬 필터 값
 ```
-
-그리고 다음 작업도 직접 해야 합니다.
-
-```text
-Component Mount
-      ↓
-useEffect()
-      ↓
-fetch()
-      ↓
-HTTP Request
-      ↓
-Response
-      ↓
-setProducts()
-      ↓
-Component Re-render
-```
-
-여기까지는 괜찮아 보입니다.
-
-하지만 애플리케이션이 커지기 시작하면 문제가 달라집니다.
-
----
-
-# 2. Server Data가 많아지면?
-
-실제 애플리케이션에는 상품만 존재하지 않습니다.
-
-```text
-Products
-Users
-Orders
-Reviews
-Cart
-Search Results
-Notifications
-...
-```
-
-각 데이터마다 다음을 반복해야 한다면 어떨까요?
-
-```text
-Request
-
-Loading State
-
-Error State
-
-Response 처리
-
-State 저장
-```
-
-더 큰 문제는 여기서 끝나지 않습니다.
-
-예를 들어 상품 목록을 이미 가져왔다고 해봅시다.
-
-```text
-Server
-   ↓
-GET /products
-   ↓
-Browser
-
-[A, B, C]
-```
-
-다른 Component에서도 똑같은 상품 목록이 필요하다면 다시 Request를 보내야 할까요?
-
-```text
-Component A
-     ↓
-GET /products
-
-Component B
-     ↓
-GET /products
-
-Component C
-     ↓
-GET /products
-```
-
-그리고 이미 가져온 데이터는 얼마나 유지해야 할까요?
-
-```text
-방금 받은 데이터인데
-다시 Server에서 가져와야 하나?
-
-기존 데이터를 재사용하면 안 되나?
-```
-
-더 어려운 문제도 있습니다.
-
-상품을 하나 추가했다고 생각해봅시다.
-
-```text
-POST /products
-```
-
-Server에는 새로운 상품이 생겼습니다.
-
-```text
-Server
-
-A
-B
-C
-D   ← 새 상품
-```
-
-그런데 Browser가 가지고 있는 상품 목록은 여전히:
-
-```text
-Cache
-
-A
-B
-C
-```
-
-일 수 있습니다.
-
-즉,
-
-```text
-Server State
-     ≠
-Client가 가지고 있는 Server Data
-```
-
-가 되어버립니다.
-
-따라서 Server Data를 관리할 때는 단순히 **"HTTP Request를 어떻게 보낼까?"**만 생각해서는 안 됩니다.
-
-우리는 결국 다음 문제를 해결해야 합니다.
-
-```text
-Fetching
-
-Loading / Error
-
-Caching
-
-Cache 공유
-
-중복 Request 방지
-
-Cache Lifetime
-
-Refetch
-
-Cache Invalidation
-
-Server ↔ Client Synchronization
-```
-
-바로 이 문제를 해결하기 위해 Redux Toolkit이 제공하는 도구가 **RTK Query**입니다.
-
----
-
-# 3. RTK Query란?
-
-RTK Query를 처음에는 다음과 같이 이해하면 충분합니다.
-
-> **RTK Query는 Server에서 데이터를 가져오고, 가져온 데이터를 Cache하고, React Component들이 그 데이터를 사용할 수 있도록 관리해주는 Redux Toolkit의 Server State 관리 도구입니다.**
-
-즉 단순히:
-
-```javascript
-fetch("/api/products");
-```
-
-를 편하게 만들어주는 Wrapper가 아닙니다.
-
-RTK Query가 실제로 해결하려는 문제는:
-
-```text
-             Server
-                ↕
-             Fetching
-                ↕
-          RTK Query Cache
-                ↕
-        React Components
-```
-
-입니다.
-
----
-
-# 4. PART 4의 `createAsyncThunk()`와 무엇이 다른가?
-
-PART 4에서는 Redux의 비동기 작업을 다음과 같이 처리했습니다.
-
-```text
-React Component
-      ↓
-dispatch(fetchProducts())
-      ↓
-Thunk Middleware
-      ↓
-createAsyncThunk()
-      ↓
-API Request
-      ↓
-Promise
-      ↓
-pending / fulfilled / rejected
-      ↓
-extraReducers
-      ↓
-Redux Store
-      ↓
-React Re-render
-```
-
-`createAsyncThunk()`는 여전히 매우 유용합니다.
-
-하지만 Server State를 관리하려면 단순한 비동기 Workflow 외에도:
-
-```text
-Cache
-
-Cache Key
-
-Subscription
-
-Request Deduplication
-
-Cache Lifetime
-
-Refetch
-
-Invalidation
-```
-
-같은 문제가 추가됩니다.
-
-따라서 역할을 크게 구분하면:
-
-```text
-일반적인 비동기 Redux Workflow
-             ↓
-     createAsyncThunk()
-
-
-Server State
-Fetching + Caching + Synchronization
-             ↓
-          RTK Query
-```
-
-라고 볼 수 있습니다.
-
----
-
-# CHAPTER 2. 가장 간단한 RTK Query부터 시작하기
-
-# 5. 먼저 전체 코드를 보자
-
-RTK Query를 처음부터 내부 구조로 이해하려고 하지 말고 먼저 실제 사용 모습을 살펴봅시다.
-
-```javascript
-import {
-    createApi,
-    fetchBaseQuery
-} from "@reduxjs/toolkit/query/react";
-
-export const apiSlice = createApi({
-
-    reducerPath: "api",
-
-    baseQuery: fetchBaseQuery({
-        baseUrl: "/api"
-    }),
-
-    endpoints: builder => ({
-
-        getProducts: builder.query({
-
-            query: () => "/products"
-
-        })
-
-    })
-
-});
-
-export const {
-    useGetProductsQuery
-} = apiSlice;
-```
-
-Component에서는:
-
-```jsx
-function ProductList() {
-
-    const {
-        data: products,
-        isLoading,
-        error
-    } = useGetProductsQuery();
-
-    if (isLoading) {
-        return <p>Loading...</p>;
-    }
-
-    if (error) {
-        return <p>Error</p>;
-    }
-
-    return (
-        <ul>
-            {products?.map(product => (
-                <li key={product.id}>
-                    {product.name}
-                </li>
-            ))}
-        </ul>
-    );
-}
-```
-
-여기서 가장 먼저 주목해야 할 부분은 이것입니다.
-
-```javascript
-useGetProductsQuery();
-```
-
-기존에는 우리가 직접:
-
-```text
-useEffect
-fetch
-data state
-loading state
-error state
-```
-
-를 관리했습니다.
-
-RTK Query에서는 Query Hook을 통해 이 작업을 훨씬 선언적으로 처리할 수 있습니다.
-
----
-
-# 6. `createApi()`
-
-RTK Query의 출발점은 `createApi()`입니다.
-
-```javascript
-const apiSlice = createApi({
-    // ...
-});
-```
-
-쉽게 말하면:
-
-> **"우리 애플리케이션에서 Server API를 RTK Query로 어떻게 관리할 것인지 정의하는 중심 설정"**
-
-이라고 생각하면 됩니다.
-
-기본 구조는:
-
-```text
-createApi()
-
-├── reducerPath
-├── baseQuery
-├── tagTypes
-└── endpoints
-```
-
-입니다.
-
-하지만 처음부터 네 가지를 모두 이해할 필요는 없습니다.
-
-먼저:
-
-```text
-createApi
-   │
-   ├── baseQuery
-   │
-   └── endpoints
-```
-
-만 이해하면 됩니다.
-
----
-
-# 7. `fetchBaseQuery()`
-
-`fetchBaseQuery()`는 RTK Query가 HTTP Request를 수행할 때 사용할 수 있는 기본 Base Query입니다.
-
-```javascript
-baseQuery: fetchBaseQuery({
-    baseUrl: "/api"
-})
-```
-
-그리고 Endpoint에서:
-
-```javascript
-query: () => "/products"
-```
-
-라고 작성하면:
-
-```text
-baseUrl
-/api
-
-   +
-
-Endpoint URL
-/products
-
-   ↓
-
-/api/products
-```
-
-가 됩니다.
-
-전체적으로는:
-
-```text
-Endpoint
-   ↓
-baseQuery
-   ↓
-fetchBaseQuery
-   ↓
-fetch()
-   ↓
-HTTP Request
-   ↓
-Server
-```
-
-라고 이해하면 됩니다.
-
----
-
-# 8. Endpoint란?
-
-Server와 어떤 작업을 할 것인지 정의하는 부분입니다.
-
-```javascript
-endpoints: builder => ({
-
-    getProducts: builder.query({
-
-        query: () => "/products"
-
-    })
-
-})
-```
-
-RTK Query의 Endpoint는 크게 두 종류입니다.
-
-```text
-Endpoint
-   │
-   ├── Query
-   │
-   └── Mutation
-```
-
-지금은 먼저 Query부터 살펴보겠습니다.
-
----
-
-# 9. Query
-
-Query는 Server State를 **조회하고 Cache하기 위한 Endpoint**입니다.
-
-```javascript
-getProducts: builder.query({
-
-    query: () => "/products"
-
-})
-```
-
-의미는 간단합니다.
-
-```text
-getProducts
-     ↓
-GET /api/products
-     ↓
-상품 데이터 조회
-     ↓
-RTK Query Cache
-```
-
-여기서 중요한 단어가 처음 등장합니다.
-
-**Cache**입니다.
-
-RTK Query는 Response를 단순히 Component에 전달하고 버리는 것이 아니라 Query 결과를 관리합니다.
-
-이것이 뒤에서 매우 중요한 역할을 합니다.
-
----
-
-# 10. Generated Hook
-
-`@reduxjs/toolkit/query/react`의 `createApi()`를 사용하면 Endpoint 정의를 기반으로 React Hook을 생성할 수 있습니다.
 
 예를 들어:
 
-```javascript
-getProducts: builder.query(...)
+```js
+const initialState = {
+  sidebarOpen: false,
+};
 ```
 
-가 있으면:
+이런 데이터는 일반적인 `createSlice()`로 관리하기 적합합니다.
 
-```javascript
-useGetProductsQuery()
-```
-
-를 사용할 수 있습니다.
+반면 다음과 같은 데이터가 있습니다.
 
 ```text
-getProducts
-     ↓
-Generated Hook
-     ↓
-useGetProductsQuery()
+상품 목록
+회원 정보
+게시글
+댓글
+주문 내역
+서버 검색 결과
 ```
 
-그래서 Component에서는:
+이 데이터의 **실제 소유자는 프론트엔드가 아니라 서버**입니다.
 
-```javascript
+이를 Server State라고 생각할 수 있습니다.
+
+```text
+Server
+   │
+   │ HTTP
+   ▼
+Client
+```
+
+클라이언트가 가지고 있는 것은 서버 데이터의 **복사본 또는 캐시**일 뿐입니다.
+
+따라서 Server State를 관리하려면 단순히 값을 저장하는 것 이상의 문제가 발생합니다.
+
+```text
+언제 가져올 것인가?
+이미 가져온 데이터가 있는가?
+다른 컴포넌트도 같은 데이터를 요청하고 있는가?
+얼마 동안 보관할 것인가?
+서버 데이터가 변경되면 어떻게 갱신할 것인가?
+요청 중인가?
+실패했는가?
+다시 요청해야 하는가?
+```
+
+RTK Query는 바로 이 문제들을 해결하기 위해 만들어졌습니다.
+
+---
+
+# 2. 기존 Redux 방식의 문제
+
+예를 들어 서버에서 게시글 목록을 가져온다고 하겠습니다.
+
+```http
+GET /posts
+```
+
+`createAsyncThunk()`를 사용한다면 보통 다음과 같은 상태가 필요합니다.
+
+```js
+const initialState = {
+  posts: [],
+  loading: false,
+  error: null,
+};
+```
+
+Thunk를 정의합니다.
+
+```js
+export const fetchPosts = createAsyncThunk(
+  'posts/fetchPosts',
+
+  async () => {
+    const response = await fetch('/posts');
+    return response.json();
+  }
+);
+```
+
+그리고 `extraReducers`에서 요청의 생명주기를 처리합니다.
+
+```js
+extraReducers: (builder) => {
+  builder
+    .addCase(fetchPosts.pending, (state) => {
+      state.loading = true;
+    })
+
+    .addCase(fetchPosts.fulfilled, (state, action) => {
+      state.loading = false;
+      state.posts = action.payload;
+    })
+
+    .addCase(fetchPosts.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.error;
+    });
+}
+```
+
+여기까지는 가능하지만 실제 애플리케이션에서는 추가 문제가 생깁니다.
+
+```text
+컴포넌트 A → GET /posts
+컴포넌트 B → GET /posts
+```
+
+둘이 같은 데이터를 요청하면?
+
+```text
+중복 요청을 할 것인가?
+기존 데이터를 재사용할 것인가?
+```
+
+게시글을 수정했다면?
+
+```text
+PUT /posts/3
+```
+
+기존 `/posts` 데이터는 이제 오래된 데이터가 될 수 있습니다.
+
+```text
+GET /posts cache
+       │
+       │ POST 수정
+       ▼
+stale data
+```
+
+따라서 다시 가져와야 할 수도 있습니다.
+
+이 모든 작업을 직접 구현하면 코드가 빠르게 복잡해집니다.
+
+RTK Query는 이러한 **서버 데이터 관리 패턴 자체를 추상화한 도구**입니다.
+
+---
+
+# 3. RTK Query의 전체 구조
+
+RTK Query를 사용할 때 가장 중요한 함수는 `createApi()`입니다.
+
+```js
+const api = createApi({
+  reducerPath: 'api',
+
+  baseQuery: fetchBaseQuery({
+    baseUrl: '/api',
+  }),
+
+  endpoints: (builder) => ({
+    ...
+  }),
+});
+```
+
+전체 구조를 먼저 보면 다음과 같습니다.
+
+```text
+createApi()
+│
+├─ baseQuery
+│
+│    HTTP 요청 실행 방법
+│
+├─ endpoints
+│
+│    ├─ query
+│
+│    └─ mutation
+│
+├─ reducer
+│
+│    서버 데이터 Cache 관리
+│
+├─ middleware
+│
+│    요청 / Subscription / Cache Lifecycle 관리
+│
+├─ selectors
+│
+├─ thunks
+│
+└─ React Hooks
+```
+
+중요한 점은 `createApi()`가 단순히 Hook만 만드는 함수가 아니라는 것입니다.
+
+`createApi()`는 하나의 **API Slice**를 생성합니다.
+
+공식 문서에 따르면 생성된 API slice에는 캐시를 관리하는 reducer, subscription과 cache lifetime을 관리하는 middleware, endpoint별 selector와 thunk가 포함되며 React용 entry point를 사용하면 React Hooks도 자동 생성됩니다.
+
+---
+
+# 4. createApi()
+
+기본 코드는 다음과 같습니다.
+
+```js
+import {
+  createApi,
+  fetchBaseQuery,
+} from '@reduxjs/toolkit/query/react';
+
+export const postApi = createApi({
+  reducerPath: 'postApi',
+
+  baseQuery: fetchBaseQuery({
+    baseUrl: 'https://example.com/',
+  }),
+
+  tagTypes: ['Post'],
+
+  endpoints: (builder) => ({
+    getPosts: builder.query({
+      query: () => 'posts',
+    }),
+  }),
+});
+```
+
+여기에서:
+
+```js
+createApi({...})
+```
+
+를 실행하면 RTK Query가 API와 관련된 Redux 로직을 생성합니다.
+
+개념적으로는 다음과 같습니다.
+
+```text
+postApi
+│
+├─ reducerPath
+├─ reducer
+├─ middleware
+├─ endpoints
+│
+│   └─ getPosts
+│
+├─ util
+│
+└─ React Hooks
+    └─ useGetPostsQuery
+```
+
+따라서 나중에 Store에 다음 두 가지를 등록합니다.
+
+```js
+postApi.reducer
+postApi.middleware
+```
+
+---
+
+# 5. reducerPath
+
+```js
+reducerPath: 'postApi'
+```
+
+는 RTK Query의 상태가 Redux Store에서 저장될 위치의 키입니다.
+
+Store를 다음처럼 구성하면:
+
+```js
+configureStore({
+  reducer: {
+    [postApi.reducerPath]: postApi.reducer,
+  },
+});
+```
+
+개념적인 Redux State는 다음과 같은 구조를 가지게 됩니다.
+
+```text
+Redux Store
+│
+└─ state
+   │
+   └─ postApi
+       │
+       ├─ queries
+       ├─ mutations
+       ├─ provided
+       ├─ subscriptions
+       └─ config
+```
+
+일반적인 slice와 비교하면:
+
+```js
+reducer: {
+  counter: counterReducer,
+}
+```
+
+가
+
+```text
+state.counter
+```
+
+를 만든다면,
+
+```js
+reducer: {
+  [postApi.reducerPath]: postApi.reducer,
+}
+```
+
+는 일반적으로
+
+```text
+state.postApi
+```
+
+아래에 RTK Query의 상태를 저장하게 됩니다.
+
+우리가 `posts`, `loading`, `error`를 직접 관리하지 않아도 되는 이유가 여기에 있습니다.
+
+RTK Query reducer가 이 정보를 관리합니다.
+
+---
+
+# 6. fetchBaseQuery()
+
+```js
+baseQuery: fetchBaseQuery({
+  baseUrl: 'https://example.com/',
+})
+```
+
+`fetchBaseQuery()`는 브라우저의 `fetch()`를 기반으로 만들어진 RTK Query용 경량 HTTP 요청 함수입니다.
+
+예를 들어:
+
+```js
+getPosts: builder.query({
+  query: () => 'posts',
+});
+```
+
+라면 최종 요청 URL은 대략 다음과 같이 만들어집니다.
+
+```text
+baseUrl
+https://example.com/
+
+        +
+
+query()
+posts
+
+        ↓
+
+https://example.com/posts
+```
+
+인증 토큰도 공통으로 설정할 수 있습니다.
+
+```js
+baseQuery: fetchBaseQuery({
+  baseUrl: '/api',
+
+  prepareHeaders: (headers, { getState }) => {
+    const token = getState().auth.token;
+
+    if (token) {
+      headers.set(
+        'authorization',
+        `Bearer ${token}`
+      );
+    }
+
+    return headers;
+  },
+});
+```
+
+그러면 각 endpoint마다 Authorization Header를 반복해서 작성하지 않아도 됩니다.
+
+---
+
+# 7. endpoints란?
+
+```js
+endpoints: (builder) => ({
+  ...
+})
+```
+
+는 서버와 어떤 작업을 할 것인지 정의하는 부분입니다.
+
+여기서 `builder`는 우리가 만드는 객체가 아닙니다.
+
+```js
+(builder) => ({
+```
+
+이 callback을 RTK Query가 호출하면서 **builder 객체를 아규먼트로 전달합니다.**
+
+그 객체에는 대표적으로 다음 메서드가 있습니다.
+
+```js
+builder.query()
+builder.mutation()
+```
+
+따라서:
+
+```text
+builder
+│
+├─ query()
+│
+│   서버 데이터 조회
+│
+└─ mutation()
+    서버 데이터 변경
+```
+
+이라는 구조입니다.
+
+---
+
+# 8. Query
+
+Query는 일반적으로 **서버 데이터를 조회**할 때 사용합니다.
+
+```text
+GET /posts
+GET /posts/3
+GET /users
+GET /products?page=2
+```
+
+예:
+
+```js
+getPosts: builder.query({
+  query: () => 'posts',
+});
+```
+
+그리고:
+
+```js
+getPostById: builder.query({
+  query: (id) => `posts/${id}`,
+});
+```
+
+React integration을 사용하면 endpoint 이름을 기반으로 Hook이 자동 생성됩니다.
+
+```text
+getPosts
+    ↓
+useGetPostsQuery
+
+getPostById
+    ↓
+useGetPostByIdQuery
+```
+
+따라서:
+
+```js
 const {
-    data,
-    isLoading,
-    error
-} = useGetProductsQuery();
+  data,
+  error,
+  isLoading,
+} = useGetPostsQuery();
 ```
 
 처럼 사용할 수 있습니다.
 
 ---
 
-# 11. Query Hook을 호출하면 무슨 일이 일어나는가?
+# 9. Mutation
 
-처음에는 다음 정도로 이해하면 충분합니다.
-
-```text
-Component
-    ↓
-useGetProductsQuery()
-    ↓
-RTK Query
-    ↓
-필요하면 Server Request
-    ↓
-Response
-    ↓
-Data 관리
-    ↓
-Component Re-render
-```
-
-하지만 이것은 입문용 설명입니다.
-
-실제로는 중간에 매우 중요한 것이 있습니다.
+Mutation은 일반적으로 서버 데이터를 변경하는 작업입니다.
 
 ```text
-Query Cache
+POST
+PUT
+PATCH
+DELETE
 ```
-
-조금 더 정확하게 표현하면:
-
-```text
-Component
-    ↓
-useGetProductsQuery()
-    ↓
-RTK Query
-    ↓
-Cache 확인
-    ↓
-필요한 경우 Request
-    ↓
-Response
-    ↓
-Cache 저장
-    ↓
-Component가 Cache 사용
-    ↓
-Component Re-render
-```
-
-이제부터 RTK Query의 진짜 핵심으로 들어갑니다.
-
----
-
-# CHAPTER 3. RTK Query의 핵심 — Server State와 Query Cache
-
-# 12. Client State와 Server State
-
-RTK Query를 제대로 이해하려면 두 종류의 State를 구분해야 합니다.
-
-```text
-Application State
-       │
-       ├── Client State
-       │
-       └── Server State
-```
-
-## Client State
-
-Client State는 애플리케이션 자체가 소유하는 상태입니다.
 
 예:
 
-```text
-Modal 열림 여부
-
-Sidebar 열림 여부
-
-현재 선택된 Tab
-
-검색 입력값
-
-Theme
-
-Wizard 진행 단계
-```
-
-이러한 State는:
-
-```text
-Local Client State
-       ↓
-    useState()
-```
-
-또는:
-
-```text
-Shared Client State
-       ↓
-   createSlice()
-```
-
-로 관리하기 좋습니다.
-
----
-
-# 13. Server State
-
-Server State는 원본 데이터가 Browser가 아니라 **Server에 존재하는 State**입니다.
-
-예:
-
-```text
-상품 정보
-회원 정보
-주문
-리뷰
-게시글
-검색 결과
-알림
-```
-
-실제 원본은:
-
-```text
-Database
-    ↓
-Backend Server
-```
-
-에 존재합니다.
-
-Browser가 가지고 있는 것은 그 데이터의 복사본입니다.
-
-```text
-Database
-    ↓
-Backend Server
-    ↓
-HTTP
-    ↓
-Browser
-    ↓
-Cached Server Data
-```
-
-따라서 Browser의 Server Data에는 특별한 문제가 발생합니다.
-
-> **"내가 가지고 있는 이 데이터가 아직 Server의 최신 데이터와 같은가?"**
-
-이 문제가 RTK Query에서 Cache와 Synchronization이 중요한 이유입니다.
-
----
-
-# 14. 가장 중요한 Mental Model
-
-RTK Query를 처음 배우면 다음처럼 생각하기 쉽습니다.
-
-```text
-Component
-    ↓
-Server Request
-    ↓
-Response
-    ↓
-Component Data
-```
-
-하지만 RTK Query에서는 다음과 같이 생각하는 것이 더 정확합니다.
-
-```text
-                 Server
-                   ↕
-                RTK Query
-                   ↓
-               Query Cache
-                   ↑
-              Subscription
-                   ↑
-               Component
-```
-
-핵심은 이것입니다.
-
-> **Component가 Server Data 자체를 소유하는 것이 아니라, RTK Query가 관리하는 Query Cache를 Component가 사용한다.**
-
-그리고 Query Hook은 단순히 Request를 보내는 함수가 아닙니다.
-
-```javascript
-useGetProductsQuery();
-```
-
-는 개념적으로:
-
-```text
-"상품 데이터를 주세요"
-        +
-"이 Query 결과를 사용하겠습니다"
-```
-
-라는 의미를 동시에 가집니다.
-
-이 Mental Model이 이해되면 이후의:
-
-```text
-Cache Key
-Subscription
-Deduplication
-Cache Lifetime
-Tag
-Invalidation
-Refetch
-```
-
-가 하나의 시스템으로 연결됩니다.
-
----
-
-# 15. Query Argument와 Cache Key
-
-특정 상품 하나를 조회한다고 해봅시다.
-
-```javascript
-useGetProductQuery(10);
-```
-
-여기서 `10`은 **Query Argument**입니다.
-
-RTK Query는 개념적으로:
-
-```text
-Endpoint
-getProduct
-
-    +
-
-Argument
-10
-
-    ↓
-
-Query Cache Entry
-```
-
-를 구성합니다.
-
-따라서:
-
-```javascript
-useGetProductQuery(10);
-
-useGetProductQuery(20);
-```
-
-은 서로 다른 Cache Entry를 사용합니다.
-
-```text
-getProduct(10)
-      ↓
-Cache Entry A
-
-
-getProduct(20)
-      ↓
-Cache Entry B
-```
-
-즉 Cache는 단순히 Endpoint 이름만으로 구분되는 것이 아닙니다.
-
-> **Endpoint + Query Argument의 직렬화된 결과가 Query Cache를 식별하는 핵심이 됩니다.**
-
----
-
-# 16. Cache와 Subscription
-
-여러 Component가 동일한 Query를 사용한다고 해봅시다.
-
-```text
-Component A ───┐
-               │
-Component B ───┼──→ Query Cache Entry
-               │
-Component C ───┘
-```
-
-세 Component가 모두:
-
-```javascript
-useGetProductQuery(10);
-```
-
-을 사용한다면 동일한 Query Cache Entry를 사용할 수 있습니다.
-
-각 Component가 각각:
-
-```text
-fetch
-data state
-loading state
-error state
-```
-
-를 독립적으로 만드는 것이 아닙니다.
-
----
-
-# 17. Subscription이란?
-
-Component에서 Query Hook을 사용하면 해당 Query Cache Entry를 **구독(Subscription)**하게 됩니다.
-
-```text
-Component
-    ↓
-Query Hook
-    ↓
-Subscription
-    ↓
-Query Cache Entry
-```
-
-쉽게 표현하면 Component가 RTK Query에게:
-
-> **"나는 이 Query 결과를 사용하고 있어."**
-
-라고 알려주는 관계라고 생각할 수 있습니다.
-
-Component가 Unmount되면:
-
-```text
-Component Unmount
-       ↓
-Subscription 제거
-```
-
-가 됩니다.
-
-하지만 중요한 점이 있습니다.
-
-> **Subscription이 사라졌다고 Cache가 반드시 즉시 삭제되는 것은 아닙니다.**
-
----
-
-# 18. Request Deduplication
-
-세 Component가 거의 동시에 같은 상품을 필요로 한다고 생각해봅시다.
-
-```text
-Component A ─┐
-Component B ─┼──→ getProduct(10)
-Component C ─┘
-                  ↓
-             Cache Entry
-```
-
-RTK Query가 Query Cache를 중심으로 Server State를 공유하기 때문에 동일한 Query에 대한 불필요한 중복 Request를 줄일 수 있습니다.
-
-이를 **Request Deduplication**이라고 합니다.
-
-즉:
-
-```text
-Component A → GET /products/10
-Component B → GET /products/10
-Component C → GET /products/10
-```
-
-처럼 무조건 세 번 요청하는 구조로 생각해서는 안 됩니다.
-
----
-
-# 19. Cache Lifetime
-
-마지막 Subscription이 사라졌다고 Cache를 바로 제거하면 어떨까요?
-
-사용자가 상품 상세 화면에서 다른 화면으로 이동했다가 바로 돌아왔는데 다시 Server Request가 필요할 수 있습니다.
-
-그래서 RTK Query는 사용되지 않는 Cache도 일정 시간 유지할 수 있습니다.
-
-```text
-Last Subscription 제거
-          ↓
-      Cache 유지
-          ↓
-  keepUnusedDataFor
-          ↓
-       시간 경과
-          ↓
-      Cache 제거
-```
-
-예를 들어:
-
-```text
-상품 상세
-    ↓
-다른 화면
-    ↓
-잠시 후 상품 상세로 복귀
-```
-
-같은 상황에서 기존 Cache를 재사용할 수 있습니다.
-
----
-
-# CHAPTER 4. Server State를 변경해보자 — Mutation
-
-# 20. Query와 Mutation
-
-Endpoint에는 두 가지 중요한 종류가 있습니다.
-
-```text
-Endpoint
-   │
-   ├── Query
-   │
-   └── Mutation
-```
-
-Query는 Server State를 **조회**합니다.
-
-```javascript
-getProducts: builder.query({
-
-    query: () => "/products"
-
-})
-```
-
-Mutation은 Server State를 **변경**합니다.
-
-```javascript
-createProduct: builder.mutation({
-
-    query: product => ({
-
-        url: "/products",
-
-        method: "POST",
-
-        body: product
-
-    })
-
-})
-```
-
-가장 기본적인 구분은:
-
-```text
-Query
-=
-Server State 조회 + Cache
-
-
-Mutation
-=
-Server State 변경
-```
-
-입니다.
-
----
-
-# 21. Mutation Hook
-
-Mutation Endpoint를 만들면 Hook도 생성됩니다.
-
-```text
-createProduct
-      ↓
-Generated Hook
-      ↓
-useCreateProductMutation()
-```
-
-사용:
-
-```javascript
-const [
-    createProduct,
-    {
-        isLoading,
-        error
-    }
-] = useCreateProductMutation();
-```
-
-그리고 사용자 이벤트에서:
-
-```javascript
-createProduct({
-    name: "Keyboard"
+```js
+addPost: builder.mutation({
+  query: (newPost) => ({
+    url: 'posts',
+    method: 'POST',
+    body: newPost,
+  }),
 });
 ```
 
-처럼 실행할 수 있습니다.
+자동 생성되는 Hook은:
 
-Query와 비교하면 중요한 차이가 있습니다.
-
-```text
-Query
-
-Component가 데이터를 필요로 함
-        ↓
-자동 Query + Subscription
-
-
-Mutation
-
-사용자가 Server Data를 변경
-        ↓
-Mutation Trigger 호출
-```
-
----
-
-# 22. Cache가 있기 때문에 새로운 문제가 생긴다
-
-Cache는 매우 유용하지만 새로운 문제를 만듭니다.
-
-처음 Server가:
-
-```text
-Server
-
-A
-B
-```
-
-이고 Query 결과가 Cache되었다고 합시다.
-
-```text
-Server          Cache
-
-A               A
-B               B
-```
-
-이제 Mutation으로 상품 `C`를 추가합니다.
-
-```text
-POST /products
-```
-
-Server는:
-
-```text
-Server
-
-A
-B
-C
-```
-
-가 됩니다.
-
-하지만 기존 Cache는:
-
-```text
-Cache
-
-A
-B
+```js
+useAddPostMutation()
 ```
 
 입니다.
 
-즉:
+Query Hook과 Mutation Hook의 사용 방법은 다릅니다.
 
-```text
-Server State
-     ≠
-Cached Server State
+Query는 Hook을 호출하면 보통 자동으로 요청합니다.
+
+```js
+const { data } = useGetPostsQuery();
 ```
 
-가 되어버렸습니다.
+Mutation은 실행 함수를 반환합니다.
 
-이 문제를 해결하기 위해 **Cache Invalidation**이 필요합니다.
+```js
+const [addPost, result] =
+  useAddPostMutation();
+```
+
+따라서 실제 요청은:
+
+```js
+addPost(newPost);
+```
+
+를 호출해야 발생합니다.
 
 ---
 
-# CHAPTER 5. Cache와 Server를 동기화하자
+# 10. Query Hook의 핵심
 
-# 23. Tag는 왜 필요한가?
-
-RTK Query는 Query Cache와 Mutation 사이의 관계를 표현하기 위해 **Tag**를 사용할 수 있습니다.
-
-먼저:
-
-```javascript
-export const apiSlice = createApi({
-
-    tagTypes: [
-        "Product"
-    ],
-
-    // ...
-});
+```js
+const {
+  data,
+  error,
+  isLoading,
+  isFetching,
+  isSuccess,
+  isError,
+  refetch,
+} = useGetPostsQuery();
 ```
 
-Tag를 처음에는 아주 단순하게 생각하면 됩니다.
-
-> **"이 Cache가 어떤 종류의 Server State와 관련되어 있는가?"를 표시하는 Label**
-
-입니다.
-
----
-
-# 24. `providesTags`
-
-상품 목록 Query가:
-
-```javascript
-getProducts: builder.query({
-
-    query: () => "/products",
-
-    providesTags: [
-        {
-            type: "Product",
-            id: "LIST"
-        }
-    ]
-
-})
-```
-
-라고 되어 있다고 해봅시다.
-
-개념적으로:
+여기서 특히 많이 혼동하는 것이:
 
 ```text
-getProducts Query
-       ↓
-Query Cache Entry
-       ↓
-   provides
-       ↓
- Product:LIST
-```
-
-입니다.
-
-즉:
-
-> **"이 Query Cache는 Product 목록과 관련된 Cache입니다."**
-
-라고 표시하는 것입니다.
-
----
-
-# 25. `invalidatesTags`
-
-상품을 생성하면 Server의 Product 목록이 변경됩니다.
-
-```javascript
-createProduct: builder.mutation({
-
-    query: product => ({
-
-        url: "/products",
-
-        method: "POST",
-
-        body: product
-
-    }),
-
-    invalidatesTags: [
-        {
-            type: "Product",
-            id: "LIST"
-        }
-    ]
-
-})
-```
-
-의미는:
-
-```text
-createProduct
-      ↓
-Server State 변경
-      ↓
-Product:LIST
-      ↓
-Invalidate
-```
-
-입니다.
-
-쉽게 말하면:
-
-> **"상품 목록과 관련된 기존 Cache를 더 이상 최신이라고 믿지 마라."**
-
-라는 의미입니다.
-
----
-
-# 26. Cache Invalidation → Automatic Refetch
-
-이제 `providesTags`와 `invalidatesTags`가 연결됩니다.
-
-```text
-getProducts Query
-       ↓
-Cache 생성
-       ↓
-providesTags
-Product:LIST
-
-
-createProduct Mutation
-       ↓
-Server 변경
-       ↓
-invalidatesTags
-Product:LIST
-       ↓
-관련 Cache Invalid
-       ↓
-Active Subscription 존재
-       ↓
-Refetch
-       ↓
-새 Response
-       ↓
-Cache Update
-       ↓
-Component Update
-```
-
-이것이 RTK Query에서 가장 중요한 흐름 중 하나입니다.
-
-즉:
-
-```text
-Mutation
-   ↓
-Server 변경
-   ↓
-Cache Invalidation
-   ↓
-Refetch
-   ↓
-Cache Update
-   ↓
-Component Update
-```
-
-를 통해 Server State와 Client Cache의 동기화를 도와줍니다.
-
----
-
-# 27. Entity Tag와 `LIST` Tag
-
-Tag는 목록 전체뿐 아니라 개별 Entity에도 붙일 수 있습니다.
-
-```text
-Product:10
-Product:20
-Product:30
-Product:LIST
-```
-
-예:
-
-```javascript
-providesTags: result =>
-
-    result
-
-        ? [
-            ...result.map(product => ({
-                type: "Product",
-                id: product.id
-            })),
-
-            {
-                type: "Product",
-                id: "LIST"
-            }
-        ]
-
-        : [
-            {
-                type: "Product",
-                id: "LIST"
-            }
-        ]
-```
-
-여기서 `"LIST"`는 Database의 Primary Key가 아닙니다.
-
-> **Tag의 `id`는 반드시 Entity Primary Key일 필요가 없습니다.**
-
-따라서:
-
-```text
-Product:LIST
-User:PROFILE
-Order:HISTORY
-Review:MINE
-```
-
-처럼 의미 기반 ID를 사용해 Cache Group을 표현할 수도 있습니다.
-
----
-
-# CHAPTER 6. Query를 조금 더 편리하게 사용하기
-
-# 28. 조건부 Query — `skip`
-
-모든 Query가 Component Mount 즉시 실행되어야 하는 것은 아닙니다.
-
-예를 들어 `productId`가 존재할 때만 조회하고 싶다면:
-
-```javascript
-const { data } =
-    useGetProductQuery(productId, {
-
-        skip: !productId
-
-    });
-```
-
-로 작성할 수 있습니다.
-
-```text
-productId 존재?
-      │
-   ┌──┴──┐
-   ↓     ↓
-  NO    YES
-   ↓     ↓
- skip   Query
- true   실행
-```
-
-대표적인 상황은:
-
-```text
-Route Parameter가 아직 없음
-
-User ID가 아직 없음
-
-선택 항목이 아직 없음
-
-특정 UI가 아직 열리지 않음
-```
-
-등입니다.
-
----
-
-# 29. Lazy Query
-
-일반 Query Hook은 Component가 데이터를 필요로 할 때 Query와 Subscription을 관리합니다.
-
-```javascript
-useGetProductQuery(id);
-```
-
-하지만 사용자의 행동이 발생했을 때만 조회하고 싶을 수도 있습니다.
-
-예를 들어 검색 버튼을 눌렀을 때 검색한다고 해봅시다.
-
-```javascript
-const [
-    triggerSearch,
-    {
-        data,
-        isFetching
-    }
-] = useLazySearchProductsQuery();
-```
-
-원하는 시점에:
-
-```javascript
-triggerSearch(keyword);
-```
-
-를 호출합니다.
-
-```text
-useLazySearchProductsQuery()
-          ↓
-      Trigger 획득
-          ↓
-      아직 Query X
-
-
-사용자 검색
-     ↓
-triggerSearch(keyword)
-     ↓
-Query 시작
-     ↓
-Server Request
-```
-
----
-
-# 30. Query vs Lazy Query vs Mutation
-
-세 가지를 구분하면:
-
-| 종류         | 의미                    | 대표 상황    |
-| ---------- | --------------------- | -------- |
-| Query      | Component가 데이터를 필요로 함 | 상품 목록    |
-| Lazy Query | 원하는 시점에 조회            | 검색       |
-| Mutation   | Server State 변경       | 생성·수정·삭제 |
-
-Mental Model:
-
-```text
-Query
-  ↓
-데이터가 필요함
-  ↓
-자동 Query + Subscription
-
-
-Lazy Query
-  ↓
-특정 시점에 조회
-  ↓
-trigger()
-
-
-Mutation
-  ↓
-Server State 변경
-  ↓
-Mutation Trigger
-```
-
----
-
-# 31. `transformResponse()`
-
-Server Response와 Component가 원하는 데이터 구조가 항상 같지는 않습니다.
-
-Server가:
-
-```javascript
-{
-    status: "SUCCESS",
-
-    data: {
-        id: 10,
-        name: "Keyboard"
-    }
-}
-```
-
-를 반환한다고 해봅시다.
-
-Component에서는 실제 `data`만 필요할 수 있습니다.
-
-```javascript
-getProduct: builder.query({
-
-    query: id =>
-        `/products/${id}`,
-
-    transformResponse: response =>
-        response.data
-
-})
-```
-
-흐름은:
-
-```text
-HTTP Response
-      ↓
-transformResponse()
-      ↓
-Client가 사용할 Data
-      ↓
-RTK Query Cache
-      ↓
-Component
-```
-
-여기서 중요한 점은:
-
-> **RTK Query Cache에는 `transformResponse()`가 반환한 값이 저장됩니다.**
-
-따라서 Server Response 구조와 Client에서 사용할 Data Model을 분리하는 데 활용할 수 있습니다.
-
----
-
-# 32. `isLoading`과 `isFetching`
-
-두 값은 비슷해 보이지만 차이가 있습니다.
-
-## `isLoading`
-
-아직 사용할 Data가 없는 최초 요청 상태를 표현할 때 중요합니다.
-
-```text
-Cache Data 없음
-      ↓
-Request
-      ↓
 isLoading
-```
-
-따라서:
-
-```text
-Loading Screen
-Skeleton UI
-```
-
-등을 보여줄 수 있습니다.
-
-## `isFetching`
-
-이미 Data가 있어도 새로운 Request가 진행 중일 수 있습니다.
-
-```text
-Existing Data
-      +
-New Request
-      ↓
+vs
 isFetching
 ```
 
-따라서 기존 화면은 유지하면서:
-
-```text
-Refreshing...
-```
-
-같은 UI를 보여줄 수 있습니다.
-
----
-
-# 33. `refetch()`
-
-Query를 명시적으로 다시 요청할 수도 있습니다.
-
-```javascript
-const {
-    data,
-    refetch
-} = useGetProductsQuery();
-```
-
-사용:
-
-```jsx
-<button onClick={refetch}>
-    새로고침
-</button>
-```
-
-이 방식은:
-
-```text
-Tag Invalidation
-      ↓
-Automatic Refetch
-```
-
-와 달리 Component가 명시적으로 Query를 다시 실행하는 방법입니다.
-
----
-
-# CHAPTER 7. RTK Query는 Redux 위에서 어떻게 동작하는가?
-
-지금까지는 RTK Query를 사용하는 입장에서 살펴봤습니다.
-
-이제 한 단계 더 깊이 들어가겠습니다.
-
----
-
-# 34. Redux Store에 RTK Query 등록
-
-API Slice를 만들었다고 모든 설정이 끝나는 것은 아닙니다.
-
-Redux Store에 Reducer와 Middleware를 등록해야 합니다.
-
-```javascript
-const store = configureStore({
-
-    reducer: {
-
-        [apiSlice.reducerPath]:
-            apiSlice.reducer
-
-    },
-
-    middleware:
-        getDefaultMiddleware =>
-
-            getDefaultMiddleware()
-                .concat(
-                    apiSlice.middleware
-                )
-
-});
-```
-
-두 요소가 중요합니다.
-
-```text
-apiSlice.reducer
-
-apiSlice.middleware
-```
-
----
-
-# 35. `reducerPath`
-
-`reducerPath`는 RTK Query의 State가 Redux Store에서 저장될 위치를 결정합니다.
-
-```javascript
-reducerPath: "api"
-```
-
-개념적으로:
-
-```text
-Redux Store
-│
-├── auth
-├── ui
-└── api
-     │
-     ├── queries
-     ├── mutations
-     └── subscriptions
-```
-
-와 같은 구조를 생각할 수 있습니다.
-
----
-
-# 36. `apiSlice.reducer`
-
-RTK Query는 Query와 Mutation 관련 State를 Redux Store에서 관리합니다.
-
-개념적으로:
-
-```text
-Redux Store
-│
-└── api
-     │
-     ├── Queries
-     ├── Mutations
-     ├── Cache-related State
-     └── Subscription-related State
-```
-
-따라서 중요한 사실은:
-
-> **RTK Query는 Redux와 별개로 동작하는 외부 Cache Library가 아닙니다.**
-
-Redux Toolkit 위에서 동작하는 Server State 관리 시스템입니다.
-
----
-
-# 37. `apiSlice.middleware`
-
-RTK Query Middleware는 여러 Runtime 동작을 담당합니다.
-
-```text
-dispatch
-    ↓
-Redux Middleware Pipeline
-    ↓
-apiSlice.middleware
-    ↓
-RTK Query Runtime
-```
-
-여기에서:
-
-```text
-Request Lifecycle
-
-Cache 관리
-
-Subscription 관리
-
-Invalidation
-
-Polling
-
-Refetch
-```
-
-등과 관련된 동작이 처리됩니다.
-
-따라서 RTK Query가 자동으로 많은 일을 해주는 것처럼 보여도 내부에는 여전히 Redux의:
-
-```text
-Store
-Reducer
-Middleware
-Action
-dispatch
-```
-
-개념이 존재합니다.
-
----
-
-# 38. `setupListeners()`
-
-RTK Query는 Browser의 Focus나 Network 상태 변화와 Query Refetch를 연결할 수도 있습니다.
-
-```javascript
-setupListeners(store.dispatch);
-```
-
-대표적인 기능은:
-
-```text
-refetchOnFocus
-
-refetchOnReconnect
-```
-
 입니다.
 
----
+`isLoading`은 보통 현재 query에 대한 데이터가 아직 없는 최초 요청 상황을 표현하는 데 적합합니다.
 
-# 39. `refetchOnFocus`
+반면 `isFetching`은 현재 네트워크 요청이 진행 중인지 나타냅니다.
 
-사용자가 다른 Browser Tab으로 이동했다가 다시 돌아왔다고 생각해봅시다.
-
-그동안 Server State가 변경되었을 수 있습니다.
+따라서 이미 데이터가 화면에 있어도 새로운 요청이 진행 중이라면:
 
 ```text
-다른 Tab으로 이동
-      ↓
-   시간 경과
-      ↓
-현재 Tab으로 복귀
-      ↓
-Window Focus
-      ↓
-RTK Query
-      ↓
-필요한 Query Refetch
+data 있음
++
+isFetching = true
 ```
 
-이를 통해 Cache와 Server State의 Synchronization을 강화할 수 있습니다.
+가 가능합니다.
 
----
-
-# 40. `refetchOnReconnect`
-
-Network가 끊겼다가 다시 연결되는 상황도 있습니다.
+예를 들면:
 
 ```text
-Online
-  ↓
-Offline
-  ↓
-Network Reconnect
-  ↓
-RTK Query
-  ↓
-Query Refetch
+첫 요청
+
+data 없음
+isLoading = true
+isFetching = true
 ```
 
-이 역시 RTK Query가 단순 Fetching Library가 아니라 **Server State Synchronization System**이라는 점을 보여줍니다.
-
----
-
-# CHAPTER 8. Query와 Mutation의 내부 실행 흐름
-
-# 41. Query의 전체 실행 흐름
-
-이제 다음 한 줄을 내부 관점에서 살펴봅시다.
-
-```javascript
-useGetProductQuery(10);
-```
-
-지금까지 배운 내용을 모두 연결하면:
+이후 데이터가 도착합니다.
 
 ```text
-React Component
-      ↓
-Generated Query Hook
-      ↓
-Endpoint + Argument
-      ↓
-Cache Key 결정
-      ↓
-Cache Entry 확인
-      ↓
-┌────────────────────┐
-│ 사용 가능한 Cache? │
-└─────────┬──────────┘
-          │
-      ┌───┴───┐
-      ↓       ↓
-     YES      NO
-      ↓       ↓
- Cache 사용   baseQuery
-      │       ↓
-      │   HTTP Request
-      │       ↓
-      │     Server
-      │       ↓
-      │    Response
-      │       ↓
-      │ transformResponse
-      │       ↓
-      └────→ Cache
-              ↑
-          Subscription
-              ↑
-           Component
+data 있음
+isLoading = false
+isFetching = false
 ```
 
-처음에 단순하게:
+그리고 background refetch가 발생하면:
 
 ```text
-Hook → Request → Response
-```
-
-라고 배웠던 구조 안에 사실 이 많은 과정이 들어 있었던 것입니다.
-
----
-
-# 42. Mutation의 전체 실행 흐름
-
-Mutation은 다음과 같이 이해할 수 있습니다.
-
-```text
-User Event
-    ↓
-Mutation Trigger
-    ↓
-Endpoint
-    ↓
-baseQuery
-    ↓
-HTTP Request
-    ↓
-Server State 변경
-    ↓
-Response
-    ↓
-Mutation Success
-    ↓
-invalidatesTags
-    ↓
-관련 Query Cache Invalid
-    ↓
-Active Subscription 존재?
-    ↓
-Refetch
-    ↓
-새로운 Server State
-    ↓
-Cache Update
-    ↓
-Component Update
-```
-
-여기에 필요하면:
-
-```text
-onQueryStarted
-queryFulfilled
-```
-
-같은 Lifecycle Logic도 추가할 수 있습니다.
-
-이제부터는 이러한 고급 기능을 살펴봅니다.
-
----
-
-# CHAPTER 9. 실전 — 애플리케이션 규모가 커졌을 때
-
-# 43. `injectEndpoints()`
-
-작은 애플리케이션에서는 하나의 파일에 Endpoint를 모두 정의해도 됩니다.
-
-```javascript
-createApi({
-
-    endpoints: builder => ({
-
-        getProducts: ...,
-        createProduct: ...,
-        getOrders: ...,
-        createOrder: ...,
-        searchProducts: ...
-
-    })
-
-});
-```
-
-하지만 Endpoint가 많아지면 파일이 지나치게 커집니다.
-
-그렇다고 기능마다 무조건:
-
-```text
-productApi = createApi()
-
-orderApi = createApi()
-
-searchApi = createApi()
-```
-
-를 만드는 것이 최선은 아닙니다.
-
-하나의 Base API Slice를 만들 수 있습니다.
-
-```javascript
-export const apiSlice = createApi({
-
-    reducerPath: "api",
-
-    baseQuery: fetchBaseQuery({
-        baseUrl: "/api"
-    }),
-
-    tagTypes: [
-        "Product",
-        "Order",
-        "User"
-    ],
-
-    endpoints: () => ({})
-
-});
-```
-
-그리고 기능별 파일에서 Endpoint를 주입합니다.
-
-```javascript
-export const productApi =
-    apiSlice.injectEndpoints({
-
-        endpoints: builder => ({
-
-            getProducts:
-                builder.query({
-
-                    query: () =>
-                        "/products"
-
-                })
-
-        })
-
-    });
-```
-
----
-
-# 44. `injectEndpoints()`의 Mental Model
-
-`injectEndpoints()`는 새로운 RTK Query Store를 만드는 것이 아닙니다.
-
-```text
-                 createApi()
-                     ↓
-                  apiSlice
-                     │
-        ┌────────────┼────────────┐
-        ↓            ↓            ↓
-    Products       Orders       Search
-        ↓            ↓            ↓
- injectEndpoints injectEndpoints injectEndpoints
-        │            │            │
-        └────────────┼────────────┘
-                     ↓
-              하나의 API Slice
-                     ↓
-              하나의 Cache System
-```
-
-즉:
-
-> **코드는 기능별로 분리하면서 RTK Query Cache와 Middleware는 하나의 API Slice를 중심으로 공유할 수 있습니다.**
-
----
-
-# CHAPTER 10. 실전 — Request 공통 처리
-
-# 45. Custom `baseQuery`는 왜 필요한가?
-
-기본적인 경우:
-
-```javascript
-fetchBaseQuery({
-    baseUrl: "/api"
-})
-```
-
-만으로 충분합니다.
-
-하지만 실제 애플리케이션에서는 모든 Request에 공통 처리가 필요할 수 있습니다.
-
-```text
-Authorization Header
-
-Cookie
-
-CSRF Token
-
-공통 Error Handling
-
-401 처리
-
-Token Refresh
-
-Logging
-```
-
-이때 `fetchBaseQuery()`를 감싸 **Custom baseQuery**를 만들 수 있습니다.
-
-```text
-Endpoint
-    ↓
-Custom baseQuery
-    ↓
-fetchBaseQuery
-    ↓
-HTTP Request
-    ↓
-Server
-    ↓
-Response
-    ↓
-Custom Response Handling
-```
-
----
-
-# 46. `prepareHeaders()`
-
-Request를 보내기 전에 공통 Header를 설정할 수 있습니다.
-
-```javascript
-const rawBaseQuery = fetchBaseQuery({
-
-    baseUrl: "/api",
-
-    prepareHeaders: headers => {
-
-        const token =
-            localStorage.getItem("token");
-
-        if (token) {
-
-            headers.set(
-                "Authorization",
-                `Bearer ${token}`
-            );
-
-        }
-
-        return headers;
-    }
-
-});
-```
-
-흐름:
-
-```text
-Endpoint
-    ↓
-fetchBaseQuery
-    ↓
-prepareHeaders()
-    ↓
-Header 추가
-    ↓
-HTTP Request
-```
-
-입니다.
-
----
-
-# 47. `credentials`
-
-Cookie 기반 인증을 사용하는 경우 `fetch`의 `credentials` 옵션을 설정할 수도 있습니다.
-
-```javascript
-fetchBaseQuery({
-
-    baseUrl: "/api",
-
-    credentials: "include"
-
-})
-```
-
-개념적으로:
-
-```text
-Browser
-   │
-   │ Cookie
-   ↓
-HTTP Request
-   ↓
-Server
-```
-
-입니다.
-
-이것은 RTK Query 고유의 인증 방식이 아니라 내부적으로 사용하는 `fetch`의 Request 정책과 연결된 설정입니다.
-
----
-
-# 48. Custom `baseQuery`와 공통 Error Handling
-
-모든 Request에서 `401 Unauthorized`를 공통 처리한다고 해봅시다.
-
-```javascript
-const rawBaseQuery =
-    fetchBaseQuery({
-        baseUrl: "/api"
-    });
-
-const baseQuery =
-    async (args, api, extraOptions) => {
-
-        const result =
-            await rawBaseQuery(
-                args,
-                api,
-                extraOptions
-            );
-
-        if (result.error?.status === 401) {
-
-            api.dispatch(
-                logout()
-            );
-
-        }
-
-        return result;
-    };
-```
-
-흐름은:
-
-```text
-Endpoint
-    ↓
-Custom baseQuery
-    ↓
-rawBaseQuery
-    ↓
-HTTP Request
-    ↓
-Server
-    ↓
-Response
-    ↓
-   401 ?
- ┌───┴───┐
- ↓       ↓
-YES      NO
- ↓        ↓
-logout   result
-dispatch return
-```
-
-입니다.
-
-Custom Base Query의 `api`를 통해:
-
-```javascript
-api.dispatch(...)
-
-api.getState()
-```
-
-등에 접근할 수 있습니다.
-
-따라서 RTK Query의 Request Lifecycle과 일반 Redux Logic을 연결할 수 있습니다.
-
----
-
-# CHAPTER 11. 실전 — Query Lifecycle
-
-# 49. `onQueryStarted()`
-
-RTK Query는 Query 또는 Mutation이 시작될 때 추가적인 Lifecycle Logic을 실행할 수 있습니다.
-
-```javascript
-updateProduct: builder.mutation({
-
-    query: product => ({
-
-        url: `/products/${product.id}`,
-
-        method: "PUT",
-
-        body: product
-
-    }),
-
-    async onQueryStarted(
-        arg,
-        {
-            dispatch,
-            queryFulfilled
-        }
-    ) {
-
-        // Request Lifecycle Logic
-
-    }
-
-})
-```
-
-Mental Model:
-
-```text
-Endpoint 시작
-     ↓
-onQueryStarted()
-     ↓
-Request Lifecycle Logic
-```
-
-입니다.
-
----
-
-# 50. `queryFulfilled`
-
-`onQueryStarted()`에서 사용할 수 있는 `queryFulfilled`는 해당 Query 또는 Mutation의 요청 결과와 연결된 Promise입니다.
-
-```text
-Endpoint 시작
-      ↓
-onQueryStarted()
-      ↓
-queryFulfilled
-      ↓
-    Promise
-   ↙      ↘
-Success  Failure
-```
-
-따라서:
-
-```javascript
-try {
-
-    const { data } =
-        await queryFulfilled;
-
-    // 성공 이후 처리
-
-} catch (error) {
-
-    // 실패 처리
-
-}
-```
-
-와 같은 Workflow를 만들 수 있습니다.
-
----
-
-# CHAPTER 12. 실전 — Hook 없이 RTK Query 사용하기
-
-# 51. `endpoint.initiate()`
-
-React Generated Hook을 사용하지 않고 Redux `dispatch()`를 통해 Endpoint를 직접 시작할 수도 있습니다.
-
-```javascript
-dispatch(
-
-    apiSlice.endpoints
-        .getCurrentUser
-        .initiate()
-
-);
-```
-
-즉 Endpoint를 시작하는 방법은:
-
-```text
-React Component
-      ↓
-Generated Hook
-
-
-또는
-
-
-Redux Logic
-      ↓
-dispatch(
-  endpoint.initiate()
-)
-      ↓
-RTK Query
+기존 data 있음
+isLoading = false
+isFetching = true
 ```
 
 가 될 수 있습니다.
 
-일반적인 React Component에서는 Generated Hook이 훨씬 편리합니다.
-
-하지만 특정 Lifecycle이나 Redux Logic에서 Query를 직접 시작해야 하는 경우 `initiate()`를 사용할 수 있습니다.
+이 차이는 로딩 UI를 설계할 때 매우 중요합니다.
 
 ---
 
-# 52. `apiSlice.util`
+# 11. RTK Query의 진짜 핵심: Cache
 
-RTK Query는 Cache를 Programmatic하게 조작할 수 있는 Utility API도 제공합니다.
+다음 두 컴포넌트를 생각해 봅시다.
 
-대표적으로:
+```jsx
+function Header() {
+  const { data } = useGetPostByIdQuery(1);
+}
 
-```javascript
-apiSlice.util.invalidateTags(...)
+function Main() {
+  const { data } = useGetPostByIdQuery(1);
+}
 ```
 
-와:
+두 컴포넌트 모두:
 
-```javascript
-apiSlice.util.upsertQueryData(...)
+```js
+useGetPostByIdQuery(1)
 ```
 
-등이 있습니다.
+을 호출합니다.
 
----
+하지만 이것이 반드시 서버 요청 두 번을 의미하지는 않습니다.
 
-# 53. `invalidateTags()`
-
-특정 Tag를 코드에서 직접 무효화할 수 있습니다.
-
-```javascript
-dispatch(
-
-    apiSlice.util.invalidateTags([
-
-        {
-            type: "Product",
-            id: "LIST"
-        }
-
-    ])
-
-);
-```
-
-흐름:
+RTK Query는 기본적으로 다음 조합을 기반으로 캐시를 구분합니다.
 
 ```text
-Redux Logic
-     ↓
-invalidateTags()
-     ↓
-RTK Query
-     ↓
-관련 Cache Invalid
-     ↓
-필요한 Query Refetch
+endpoint
++
+serialized query argument
 ```
 
-일반적인 Mutation에서는 `invalidatesTags`를 선언적으로 사용하는 것이 자연스럽습니다.
+예:
 
-하지만 Mutation 외부의 Logic에서 Cache를 무효화해야 할 때 사용할 수 있습니다.
+```text
+getPostById + 1
+```
+
+이 조합에서 내부적인 `queryCacheKey`가 생성됩니다.
+
+개념적으로:
+
+```text
+getPostById(1)
+        │
+        ▼
+queryCacheKey
+        │
+        ▼
+Cache Entry
+```
+
+따라서 Header와 Main이 같은 endpoint와 같은 아규먼트를 사용하면 같은 cache entry를 공유할 수 있습니다.
+
+```text
+Header
+  │
+  └──────┐
+         ▼
+ getPostById(1)
+         │
+      Cache
+         │
+ getPostById(1)
+         ▲
+  ┌──────┘
+Main
+```
+
+이것이 RTK Query의 **Deduplication**입니다.
 
 ---
 
-# 54. `upsertQueryData()`
+# 12. 아규먼트가 다르면 다른 Cache
 
-특정 Query Cache Entry에 데이터를 직접 넣거나 업데이트할 수도 있습니다.
+다음 요청들은 서로 다릅니다.
 
-```javascript
-dispatch(
+```js
+useGetPostByIdQuery(1);
 
-    apiSlice.util.upsertQueryData(
+useGetPostByIdQuery(2);
 
-        "getCurrentUser",
+useGetPostByIdQuery(3);
+```
 
-        undefined,
+개념적으로 각각 다른 cache entry가 만들어집니다.
 
-        user
+```text
+getPostById(1)
+     ↓
+Cache A
 
-    )
+getPostById(2)
+     ↓
+Cache B
 
-);
+getPostById(3)
+     ↓
+Cache C
+```
+
+따라서 RTK Query의 캐시는 단순히:
+
+```text
+endpoint마다 하나
+```
+
+가 아닙니다.
+
+더 정확히는:
+
+```text
+endpoint + serialized arguments
+```
+
+조합을 기준으로 생성됩니다.
+
+---
+
+# 13. Subscription
+
+RTK Query에서 매우 중요한 개념이 **Subscription**입니다.
+
+컴포넌트가:
+
+```js
+useGetPostsQuery();
+```
+
+를 호출하면 단순히 데이터를 요청하는 것만이 아닙니다.
+
+개념적으로 해당 cache entry에 대해:
+
+```text
+"이 컴포넌트가 이 데이터를 사용하고 있습니다."
+```
+
+라는 subscription이 만들어집니다.
+
+예를 들어:
+
+```text
+Component A
+useGetPostsQuery()
+        │
+        ▼
+
+getPosts cache
+subscription count = 1
+```
+
+Component B도 같은 Query를 사용하면:
+
+```text
+Component A ─┐
+             │
+             ▼
+        getPosts cache
+             ▲
+             │
+Component B ─┘
+
+subscription count = 2
+```
+
+Component A가 unmount되면:
+
+```text
+subscription count
+2 → 1
+```
+
+Component B까지 unmount되면:
+
+```text
+subscription count
+1 → 0
+```
+
+이 reference count가 cache lifetime 관리에서 중요합니다.
+
+---
+
+# 14. Cache는 컴포넌트가 사라지면 즉시 삭제되는가?
+
+아닙니다.
+
+기본적으로 마지막 subscription이 제거되어 reference count가 0이 된 뒤에도 cache data는 잠시 유지됩니다.
+
+RTK Query의 기본 `keepUnusedDataFor` 값은 **60초**입니다.
+
+```text
+Component mounted
+       │
+       ▼
+subscription = 1
+       │
+       │ unmount
+       ▼
+subscription = 0
+       │
+       │
+       │ 60 seconds
+       ▼
+Cache 제거
+```
+
+그 시간 안에 같은 Query를 사용하는 컴포넌트가 다시 나타나면 기존 cache data를 사용할 수 있습니다.
+
+설정도 가능합니다.
+
+```js
+createApi({
+  keepUnusedDataFor: 120,
+});
+```
+
+또는 endpoint별로 설정할 수 있습니다.
+
+```js
+getPosts: builder.query({
+  query: () => 'posts',
+  keepUnusedDataFor: 300,
+});
+```
+
+---
+
+# 15. useGetPostsQuery() 내부 흐름
+
+이제 가장 중요한 전체 흐름입니다.
+
+컴포넌트에서:
+
+```js
+const { data } =
+  useGetPostsQuery();
+```
+
+를 실행했다고 하겠습니다.
+
+전체 흐름을 개념적으로 보면:
+
+```text
+React Component
+        │
+        │ useGetPostsQuery()
+        ▼
+RTK Query Hook
+        │
+        ▼
+getPosts endpoint
+        │
+        ▼
+queryCacheKey 생성
+        │
+        ▼
+Redux Store Cache 확인
+        │
+        ├──────────────┐
+        │              │
+   Cache 없음       Cache 있음
+        │              │
+        ▼              ▼
+ HTTP Request       기존 Cache 사용
+        │
+        ▼
+ fetchBaseQuery
+        │
+        ▼
+      Server
+        │
+        ▼
+    Response
+        │
+        ▼
+RTK Query reducer
+        │
+        ▼
+ Redux Store Cache
+        │
+        ▼
+React Component
+```
+
+이 구조가 RTK Query의 핵심입니다.
+
+---
+
+# 16. Redux Store에는 무엇이 저장되는가?
+
+기존 Redux 방식에서는 우리가 직접:
+
+```js
+{
+  posts: [],
+  loading: false,
+  error: null
+}
+```
+
+를 정의했습니다.
+
+RTK Query에서는 이러한 서버 요청 상태를 RTK Query가 관리합니다.
+
+개념적으로:
+
+```text
+state.postApi
+│
+├─ queries
+│   │
+│   └─ getPosts(...)
+│       ├─ status
+│       ├─ data
+│       ├─ error
+│       └─ timestamps
+│
+├─ mutations
+│
+├─ provided
+│
+├─ subscriptions
+│
+└─ config
+```
+
+즉:
+
+```js
+const { data, isLoading, error }
+```
+
+값들이 마법처럼 생기는 것이 아닙니다.
+
+RTK Query가 Redux Store에 저장하고 관리하는 요청 상태를 Hook이 읽어서 React 컴포넌트에 제공하는 것입니다.
+
+---
+
+# 17. RTK Query reducer의 역할
+
+Store에는 반드시:
+
+```js
+[postApi.reducerPath]: postApi.reducer
+```
+
+가 필요합니다.
+
+```js
+export const store = configureStore({
+  reducer: {
+    [postApi.reducerPath]: postApi.reducer,
+  },
+});
+```
+
+이 reducer는 RTK Query가 관리하는:
+
+```text
+Query 결과
+Mutation 상태
+Cache 상태
+Tag 관련 상태
+요청 상태
+```
+
+등을 Redux Store에 반영합니다.
+
+즉:
+
+```text
+postApi.reducer
+=
+RTK Query 상태를 Redux Store에 저장하는 reducer
+```
+
+라고 이해하면 됩니다.
+
+---
+
+# 18. middleware는 왜 필요한가?
+
+RTK Query에서 reducer만 등록해서는 충분하지 않습니다.
+
+```js
+middleware: (getDefaultMiddleware) =>
+  getDefaultMiddleware()
+    .concat(postApi.middleware)
+```
+
+가 필요합니다.
+
+RTK Query middleware는 단순 HTTP middleware가 아닙니다.
+
+RTK Query의 동작 과정에서 필요한 **비동기 요청과 cache lifecycle, subscription 기반 동작, invalidation/refetch 등의 orchestration**에 관여합니다.
+
+큰 구조로 보면:
+
+```text
+Component
+    │
+    ▼
+RTK Query Hook
+    │
+    ▼
+dispatch
+    │
+    ▼
+Redux Middleware Chain
+    │
+    ├─ Redux Toolkit default middleware
+    │
+    └─ postApi.middleware
+              │
+              ├─ Query lifecycle
+              ├─ Subscription
+              ├─ Cache lifecycle
+              ├─ Invalidation
+              └─ Re-fetch 관련 처리
+```
+
+따라서 Store에는 두 가지가 모두 필요합니다.
+
+```text
+postApi.reducer
+        +
+postApi.middleware
+```
+
+---
+
+# 19. 전체 Store 설정
+
+```js
+import { configureStore } from '@reduxjs/toolkit';
+import { postApi } from './postApi';
+
+export const store = configureStore({
+  reducer: {
+    [postApi.reducerPath]: postApi.reducer,
+  },
+
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware()
+      .concat(postApi.middleware),
+});
+```
+
+그리고 React Redux의 Provider는 그대로 사용합니다.
+
+```jsx
+import { Provider } from 'react-redux';
+import { store } from './store';
+
+<Provider store={store}>
+  <App />
+</Provider>
+```
+
+전체 관계는:
+
+```text
+<Provider store={store}>
+        │
+        ▼
+    Redux Store
+        │
+        ├─ ordinary reducers
+        │
+        └─ RTK Query reducer
+                 ▲
+                 │
+         RTK Query middleware
+                 ▲
+                 │
+       generated query hooks
+                 ▲
+                 │
+          React Components
+```
+
+입니다.
+
+---
+
+# 20. Tags를 정확하게 이해하기
+
+다음 코드를 보겠습니다.
+
+```js
+providesTags: ['Post']
+```
+
+이를:
+
+```text
+이 Query는 Post Tag를 구독한다
+```
+
+라고 설명하면 정확하지 않습니다.
+
+**Subscription과 Tag는 다른 개념입니다.**
+
+Subscription은:
+
+```text
+어떤 컴포넌트가 어떤 cache entry를 사용하고 있는가?
+```
+
+를 관리하는 개념입니다.
+
+Tag는:
+
+```text
+어떤 cache data가 어떤 종류의 데이터인가?
+```
+
+를 표시하기 위한 **cache invalidation label**입니다.
+
+따라서:
+
+```js
+providesTags: ['Post']
+```
+
+의 의미는:
+
+```text
+"이 Query가 만든 cache data는
+Post라는 Tag를 제공한다."
+```
+
+에 가깝습니다.
+
+---
+
+# 21. Cache Invalidation
+
+게시글 목록을 가져왔다고 하겠습니다.
+
+```js
+getPosts: builder.query({
+  query: () => 'posts',
+  providesTags: ['Post'],
+});
+```
+
+캐시는 개념적으로:
+
+```text
+getPosts Cache
+      │
+      └─ Tag: Post
+```
+
+가 됩니다.
+
+이후 게시글을 추가합니다.
+
+```js
+addPost: builder.mutation({
+  query: (post) => ({
+    url: 'posts',
+    method: 'POST',
+    body: post,
+  }),
+
+  invalidatesTags: ['Post'],
+});
+```
+
+Mutation 성공 후:
+
+```text
+addPost()
+   │
+   ▼
+POST /posts
+   │
+   ▼
+Success
+   │
+   ▼
+invalidate "Post"
+   │
+   ▼
+Post Tag를 제공한 cache 탐색
+   │
+   ▼
+getPosts cache invalid
+```
+
+현재 해당 Query를 사용하는 active subscription이 있다면 관련 Query가 다시 fetch될 수 있습니다.
+
+```text
+Mutation 성공
+      │
+      ▼
+Post Tag invalidation
+      │
+      ▼
+getPosts cache stale
+      │
+      ▼
+active subscription 존재
+      │
+      ▼
+Automatic Re-fetch
+      │
+      ▼
+GET /posts
+```
+
+이것이 RTK Query의 가장 강력한 기능 중 하나입니다.
+
+---
+
+# 22. Tag를 ID 단위로 관리하기
+
+모든 Post를 무효화하는 방식은 편하지만 범위가 큽니다.
+
+```js
+invalidatesTags: ['Post']
+```
+
+게시글 하나만 수정했는데 모든 Post 관련 Query를 다시 요청할 수도 있기 때문입니다.
+
+더 세밀하게 관리할 수 있습니다.
+
+```js
+getPostById: builder.query({
+  query: (id) => `posts/${id}`,
+
+  providesTags: (result, error, id) => [
+    { type: 'Post', id },
+  ],
+});
+```
+
+그러면:
+
+```text
+getPostById(1)
+→ { type: 'Post', id: 1 }
+
+getPostById(2)
+→ { type: 'Post', id: 2 }
+```
+
+처럼 구분할 수 있습니다.
+
+수정 Mutation도:
+
+```js
+updatePost: builder.mutation({
+  query: ({ id, ...patch }) => ({
+    url: `posts/${id}`,
+    method: 'PATCH',
+    body: patch,
+  }),
+
+  invalidatesTags: (result, error, arg) => [
+    { type: 'Post', id: arg.id },
+  ],
+});
+```
+
+로 만들 수 있습니다.
+
+그러면:
+
+```text
+Post 3 수정
+       │
+       ▼
+{ type: "Post", id: 3 }
+invalidate
+       │
+       ▼
+Post 3과 관련된 cache
+```
+
+를 정밀하게 무효화할 수 있습니다.
+
+---
+
+# 23. LIST Tag 패턴
+
+실무에서는 목록과 개별 데이터를 구분하기 위해 `'LIST'` 같은 추상 ID를 많이 활용할 수 있습니다.
+
+```js
+getPosts: builder.query({
+  query: () => 'posts',
+
+  providesTags: (result) =>
+    result
+      ? [
+          ...result.map(({ id }) => ({
+            type: 'Post',
+            id,
+          })),
+
+          {
+            type: 'Post',
+            id: 'LIST',
+          },
+        ]
+      : [
+          {
+            type: 'Post',
+            id: 'LIST',
+          },
+        ],
+});
+```
+
+예를 들어 다음 데이터가 있다면:
+
+```text
+Posts List Cache
+
+Post / 1
+Post / 2
+Post / 3
+Post / LIST
+```
+
+새 게시글 추가 시:
+
+```js
+invalidatesTags: [
+  { type: 'Post', id: 'LIST' },
+]
+```
+
+만 무효화할 수 있습니다.
+
+반면 Post 3 수정은:
+
+```js
+invalidatesTags: [
+  { type: 'Post', id: 3 },
+]
+```
+
+처럼 처리할 수 있습니다.
+
+이렇게 하면 불필요한 refetch를 줄일 수 있습니다.
+
+---
+
+# 24. Query와 Mutation의 전체 관계
+
+RTK Query의 구조를 한 장으로 생각하면 다음과 같습니다.
+
+```text
+                    ┌─────────────────┐
+                    │     Server      │
+                    └────────┬────────┘
+                             │
+                 HTTP Request│Response
+                             │
+                    ┌────────▼────────┐
+                    │ fetchBaseQuery  │
+                    └────────┬────────┘
+                             │
+                    ┌────────▼────────┐
+                    │     createApi   │
+                    │                 │
+                    │   endpoints     │
+                    │                 │
+                    │ query mutation  │
+                    └───────┬─────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+              ▼                           ▼
+          Query Cache                  Mutation
+              │                           │
+              │                    invalidatesTags
+              │                           │
+              ◀──── providesTags ─────────┘
+              │
+              ▼
+          Redux Store
+              │
+              ▼
+        generated Hook
+              │
+              ▼
+      React Component
+```
+
+---
+
+# 25. 자동 생성 Hook
+
+다음 endpoint가 있다면:
+
+```js
+endpoints: (builder) => ({
+  getPosts: builder.query({...}),
+  getPostById: builder.query({...}),
+  addPost: builder.mutation({...}),
+})
+```
+
+React용 `createApi`는 endpoint 이름을 기반으로 Hook을 생성합니다.
+
+```text
+getPosts
+→ useGetPostsQuery
+
+getPostById
+→ useGetPostByIdQuery
+
+addPost
+→ useAddPostMutation
+```
+
+따라서:
+
+```js
+export const {
+  useGetPostsQuery,
+  useGetPostByIdQuery,
+  useAddPostMutation,
+} = postApi;
+```
+
+처럼 사용할 수 있습니다.
+
+---
+
+# 26. 완성된 API Slice
+
+```js
+import {
+  createApi,
+  fetchBaseQuery,
+} from '@reduxjs/toolkit/query/react';
+
+export const postApi = createApi({
+  reducerPath: 'postApi',
+
+  baseQuery: fetchBaseQuery({
+    baseUrl: 'https://example.com/api/',
+  }),
+
+  tagTypes: ['Post'],
+
+  endpoints: (builder) => ({
+    getPosts: builder.query({
+      query: () => 'posts',
+
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({
+                type: 'Post',
+                id,
+              })),
+              {
+                type: 'Post',
+                id: 'LIST',
+              },
+            ]
+          : [
+              {
+                type: 'Post',
+                id: 'LIST',
+              },
+            ],
+    }),
+
+    getPostById: builder.query({
+      query: (id) => `posts/${id}`,
+
+      providesTags: (result, error, id) => [
+        {
+          type: 'Post',
+          id,
+        },
+      ],
+    }),
+
+    addPost: builder.mutation({
+      query: (newPost) => ({
+        url: 'posts',
+        method: 'POST',
+        body: newPost,
+      }),
+
+      invalidatesTags: [
+        {
+          type: 'Post',
+          id: 'LIST',
+        },
+      ],
+    }),
+
+    updatePost: builder.mutation({
+      query: ({ id, ...patch }) => ({
+        url: `posts/${id}`,
+        method: 'PATCH',
+        body: patch,
+      }),
+
+      invalidatesTags: (
+        result,
+        error,
+        { id }
+      ) => [
+        {
+          type: 'Post',
+          id,
+        },
+      ],
+    }),
+  }),
+});
+
+export const {
+  useGetPostsQuery,
+  useGetPostByIdQuery,
+  useAddPostMutation,
+  useUpdatePostMutation,
+} = postApi;
+```
+
+---
+
+# 27. Mutation과 unwrap()
+
+Mutation Hook은 다음처럼 사용합니다.
+
+```js
+const [addPost, {
+  isLoading,
+  error,
+}] = useAddPostMutation();
+```
+
+그리고:
+
+```js
+addPost(newPost);
+```
+
+를 호출합니다.
+
+Mutation trigger의 반환값은 `.unwrap()`을 사용할 수 있습니다.
+
+```js
+try {
+  const result = await addPost({
+    title: 'Redux',
+    body: 'RTK Query',
+  }).unwrap();
+
+  console.log(result);
+} catch (error) {
+  console.error(error);
+}
+```
+
+`.unwrap()`을 사용하면 성공 payload를 직접 얻거나 실패를 `catch`에서 처리하기 편합니다.
+
+---
+
+# 28. refetch()
+
+Query Hook은 `refetch`도 제공합니다.
+
+```js
+const {
+  data,
+  refetch,
+} = useGetPostsQuery();
+```
+
+직접 다시 요청하고 싶다면:
+
+```jsx
+<button onClick={refetch}>
+  다시 가져오기
+</button>
+```
+
+처럼 사용할 수 있습니다.
+
+하지만 RTK Query에서는 가능한 경우 매번 수동 `refetch()`를 호출하기보다 **Tag Invalidation을 통해 데이터 관계를 선언하는 방식**이 더 자연스러운 경우가 많습니다.
+
+---
+
+# 29. Polling
+
+주기적으로 서버 데이터를 갱신할 수도 있습니다.
+
+```js
+useGetPostsQuery(undefined, {
+  pollingInterval: 3000,
+});
 ```
 
 개념적으로:
 
 ```text
-Redux Logic
-     ↓
-upsertQueryData()
-     ↓
-Query Cache Entry
-     ↓
-Data Update
+GET /posts
+    │
+  3 sec
+    │
+GET /posts
+    │
+  3 sec
+    │
+GET /posts
 ```
 
-입니다.
+형태가 됩니다.
 
-즉 반드시 새로운 Server Request를 수행해야만 Cache를 변경할 수 있는 것은 아닙니다.
+실시간 대시보드나 지속적인 상태 확인 같은 경우에 활용할 수 있습니다.
 
 ---
 
-# CHAPTER 13. 지금까지 배운 Redux 도구들의 역할
+# 30. refetchOnFocus와 refetchOnReconnect
 
-# 55. `useState`, `createSlice`, `createAsyncThunk`, RTK Query
+사용자가 다른 탭으로 이동했다가 다시 돌아왔을 때 데이터를 새로 가져오거나, 네트워크 연결이 복구되었을 때 다시 요청하도록 구성할 수도 있습니다.
 
-지금까지 여러 State 관리 도구를 배웠습니다.
+Store 설정에서 보통:
 
-각각의 역할을 구분해봅시다.
+```js
+import { setupListeners } from '@reduxjs/toolkit/query';
 
-```text
-Local UI State
-      ↓
-useState()
+setupListeners(store.dispatch);
 ```
 
-예:
+를 추가하고 Query 옵션을 사용할 수 있습니다.
 
-```text
-Modal
-Input
-Toggle
+```js
+useGetPostsQuery(undefined, {
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
+});
 ```
+
+이 기능은 오래된 cache를 자연스럽게 최신 상태로 유지하는 데 유용합니다.
 
 ---
 
-```text
-Shared Client State
-      ↓
-createSlice()
+# 31. skip
+
+아직 Query를 실행하면 안 되는 상황도 있습니다.
+
+예를 들어 로그인한 사용자의 ID가 아직 없다면:
+
+```js
+const { data } =
+  useGetUserQuery(userId, {
+    skip: !userId,
+  });
 ```
 
-예:
-
-```text
-인증 상태
-Theme
-전역 UI State
-```
+`userId`가 없는 동안 Query를 실행하지 않습니다.
 
 ---
 
-```text
-일반적인 비동기 Redux Workflow
-      ↓
-createAsyncThunk()
+# 32. transformResponse
+
+서버의 응답 구조가 다음과 같다고 하겠습니다.
+
+```json
+{
+  "success": true,
+  "result": {
+    "posts": []
+  }
+}
 ```
+
+컴포넌트가 필요한 것은 `posts`뿐일 수 있습니다.
+
+```js
+getPosts: builder.query({
+  query: () => 'posts',
+
+  transformResponse: (response) =>
+    response.result.posts,
+});
+```
+
+그러면 cache에는 컴포넌트가 사용하기 편하게 변환된 데이터를 저장할 수 있습니다.
 
 ---
 
+# 33. Optimistic Update
+
+일반적인 Mutation은:
+
 ```text
-Server State
-
-Fetching
-+
-Caching
-+
-Synchronization
-
-      ↓
-
-RTK Query
+사용자 클릭
+   ↓
+Server Request
+   ↓
+Server Response
+   ↓
+UI Update
 ```
 
-하지만 실제 애플리케이션에서는 이들이 완전히 독립적인 것은 아닙니다.
+순서입니다.
+
+따라서 서버가 느리면 UI 반응도 느껴질 수 있습니다.
+
+Optimistic Update는 순서를 바꿉니다.
+
+```text
+사용자 클릭
+   ↓
+UI 즉시 변경
+   ↓
+Server Request
+   │
+   ├─ 성공 → 유지
+   │
+   └─ 실패 → rollback
+```
+
+RTK Query에서는 `onQueryStarted`와 cache update utility 등을 이용하여 구현할 수 있습니다.
+
+개념적으로:
+
+```js
+async onQueryStarted(
+  arg,
+  { dispatch, queryFulfilled }
+) {
+  const patchResult = dispatch(
+    postApi.util.updateQueryData(
+      'getPosts',
+      undefined,
+      (draft) => {
+        // cache를 먼저 변경
+      }
+    )
+  );
+
+  try {
+    await queryFulfilled;
+  } catch {
+    patchResult.undo();
+  }
+}
+```
+
+처럼 처리할 수 있습니다.
+
+---
+
+# 34. Prefetch
+
+사용자가 실제 페이지로 이동하기 전에 데이터를 미리 요청할 수도 있습니다.
 
 예를 들어:
 
 ```text
-RTK Query
-    ↓
-onQueryStarted
-    ↓
-dispatch()
-    ↓
-createSlice State 변경
+사용자가 게시글 링크에 mouse hover
+           │
+           ▼
+        Prefetch
+           │
+           ▼
+      GET /posts/3
+           │
+           ▼
+        Cache 저장
+           │
+           ▼
+사용자가 게시글 페이지 이동
+           │
+           ▼
+      Cache 즉시 사용
 ```
 
-처럼 서로 연결할 수도 있습니다.
+이렇게 하면 페이지 전환 체감 속도를 개선할 수 있습니다.
 
 ---
 
-# 56. RTK Query가 Redux를 없애는 것은 아니다
+# 35. RTK Query의 전체 실행 흐름
 
-RTK Query 내부에도 여전히 Redux의 핵심 개념이 존재합니다.
-
-```text
-Redux Store
-
-Reducer
-
-Middleware
-
-Action
-
-dispatch
-```
-
-따라서 다음 학습 순서는 의미가 있습니다.
+마지막으로 전체 흐름을 정리하면 다음과 같습니다.
 
 ```text
-Redux Fundamentals
-       ↓
-Redux Toolkit
-       ↓
-Middleware / Thunk
-       ↓
-createAsyncThunk
-       ↓
-RTK Query
+① React Component render
+
+        ↓
+
+② useGetPostsQuery()
+
+        ↓
+
+③ RTK Query endpoint 호출
+
+        ↓
+
+④ endpoint + argument
+   → queryCacheKey 생성
+
+        ↓
+
+⑤ Redux Store Cache 확인
+
+        ↓
+
+   ┌───────────────┐
+   │ Cache 존재?   │
+   └───────┬───────┘
+           │
+      ┌────┴────┐
+      │         │
+     YES       NO
+      │         │
+      ▼         ▼
+Cache 사용   Query 시작
+                │
+                ▼
+        RTK Query middleware
+                │
+                ▼
+          fetchBaseQuery
+                │
+                ▼
+             Server
+                │
+                ▼
+            Response
+                │
+                ▼
+         RTK Query reducer
+                │
+                ▼
+          Redux Store Cache
+                │
+                ▼
+        React Component
+          re-render
 ```
 
-RTK Query는 Redux를 대체하는 별개의 기술이 아닙니다.
+여기에 Subscription까지 포함하면:
 
-> **Redux Toolkit 위에서 Server State의 Fetching, Caching, Synchronization 문제를 해결하도록 설계된 도구입니다.**
+```text
+Component mount
+       │
+       ▼
+useQuery()
+       │
+       ▼
+Cache Entry 구독
+       │
+       ▼
+subscription +1
+
+...
+
+Component unmount
+       │
+       ▼
+subscription -1
+       │
+       ▼
+subscription = 0
+       │
+       ▼
+keepUnusedDataFor timer
+       │
+       ▼
+Cache 제거
+```
+
+가 됩니다.
 
 ---
 
-# 57. 최종 Mental Model
-
-이제 RTK Query 전체를 하나의 그림으로 연결해봅시다.
+# 36. Mutation까지 포함한 최종 데이터 흐름
 
 ```text
-                         Server
-                           ↕
-                       baseQuery
-                           ↕
-                        Endpoint
-                           │
-              ┌────────────┴────────────┐
-              ↓                         ↓
-            Query                    Mutation
-              │                         │
-              ↓                         ↓
-         Query Cache              Server 변경
-              │                         │
-              │                  invalidatesTags
-              │                         │
-              │                   Cache Invalid
-              │                         │
-              │                      Refetch
-              │                         │
-              └────────────┬────────────┘
-                           ↓
-                    Query Cache Entry
-                           ↑
-                      Subscription
-                           ↑
-                    React Component
-```
-
-이 그림에서 가장 먼저 볼 것은 세 가지입니다.
-
-```text
-Query
-   ↓
-Cache
-   ↓
-Component
-```
-
-그리고 Mutation이 발생하면:
-
-```text
-Mutation
-   ↓
-Server State 변경
-   ↓
-Invalidation
-   ↓
-Refetch
-   ↓
-Cache Update
-   ↓
-Component Update
-```
-
-가 연결됩니다.
-
----
-
-# 58. 애플리케이션이 커지면
-
-규모가 커지면:
-
-```text
-                       createApi()
-                           ↓
-                        apiSlice
-                           ↓
-                    injectEndpoints()
-                           │
-          ┌────────────────┼────────────────┐
-          ↓                ↓                ↓
-      Product           Order           Search
-      Endpoints        Endpoints        Endpoints
-          │                │                │
-          └────────────────┼────────────────┘
-                           ↓
-                    하나의 API Slice
-                           ↓
-                    하나의 Cache System
-                           ↓
-                      Redux Store
-```
-
-형태로 확장할 수 있습니다.
-
----
-
-# 59. RTK Query를 한 문장으로 정의한다면
-
-RTK Query를 단순히:
-
-```text
-API 호출을 쉽게 해주는 Library
-```
-
-라고 기억하면 핵심을 놓치게 됩니다.
-
-조금 더 정확하게 정의하면:
-
-> **RTK Query는 Redux Toolkit 위에서 Server State를 가져오고(Fetching), Query 결과를 저장하고 공유하며(Caching), Server의 변경과 Client Cache를 다시 맞추는(Synchronization) 작업을 관리하는 Server State 관리 시스템입니다.**
-
-따라서 RTK Query의 핵심은:
-
-```text
-Server
-   ↕
-Fetching
-   ↕
-Query Cache
-   ↕
-Subscription
-   ↕
+                  SERVER
+                    ▲
+                    │
+              HTTP Request
+                    │
+             fetchBaseQuery
+                    ▲
+                    │
+             RTK Query API
+          ┌─────────┴─────────┐
+          │                   │
+        Query              Mutation
+          │                   │
+          │              invalidatesTags
+          │                   │
+          ▼                   │
+       Cache ◀────────────────┘
+          │
+     providesTags
+          │
+          ▼
+      Redux Store
+          │
+          ▼
+Generated React Hook
+          │
+          ▼
 React Component
 ```
 
-그리고 Server State가 변경되었을 때:
-
-```text
-Mutation
-   ↓
-Invalidation
-   ↓
-Refetch
-   ↓
-Cache Update
-   ↓
-Component Update
-```
-
-라는 구조에 있습니다.
+이 흐름을 이해하는 것이 RTK Query 학습의 핵심입니다.
 
 ---
 
-# 60. 처음 공부할 때 반드시 기억해야 할 것
+# 37. createAsyncThunk와 RTK Query의 차이
 
-이 문서에 등장한 모든 API를 한 번에 암기할 필요는 없습니다.
+`createAsyncThunk()`와 RTK Query는 둘 다 비동기 요청에 사용할 수 있지만 목적이 다릅니다.
 
-## 1단계 — 반드시 이해
+| 영역                 | createAsyncThunk | RTK Query   |
+| ------------------ | ---------------- | ----------- |
+| 비동기 작업             | 직접 정의            | Endpoint 선언 |
+| pending            | reducer에서 처리     | 자동 관리       |
+| fulfilled          | reducer에서 처리     | 자동 관리       |
+| rejected           | reducer에서 처리     | 자동 관리       |
+| 서버 데이터 Cache       | 직접 구현            | 자동 관리       |
+| 중복 Query 제거        | 직접 구현            | 지원          |
+| Subscription       | 직접 구현 필요         | 자동 관리       |
+| Cache Lifetime     | 직접 구현            | 지원          |
+| 자동 Refetch         | 직접 구현            | 지원          |
+| Cache Invalidation | 직접 구현            | Tags 제공     |
+| React Hook         | 직접 연결            | 자동 생성 가능    |
+| Optimistic Update  | 직접 구현            | 관련 API 제공   |
+| Polling            | 직접 구현            | 지원          |
+| Prefetch           | 직접 구현            | 지원          |
+
+따라서 단순히:
 
 ```text
-RTK Query가 왜 필요한가?
-
-Query
-
-Mutation
-
-Generated Hook
-
-Server State
-
-Query Cache
+RTK Query
+=
+createAsyncThunk의 짧은 버전
 ```
 
-## 2단계 — 핵심 원리
+이라고 이해해서는 안 됩니다.
+
+더 정확하게는:
+
+```text
+createAsyncThunk
+→ 범용적인 비동기 Redux 로직
+
+RTK Query
+→ 서버 데이터 fetching + caching 문제에 특화된 시스템
+```
+
+입니다.
+
+실제로 RTK Query 자체도 내부적으로 Redux Toolkit의 `createSlice`와 `createAsyncThunk` 기반 기능을 활용해 구성되어 있습니다.
+
+---
+
+# 38. RTK Query와 TanStack Query
+
+둘 모두 서버 상태를 관리하기 위한 강력한 도구이지만 생태계와 설계 방향이 다릅니다.
+
+| 항목               | RTK Query             | TanStack Query            |
+| ---------------- | --------------------- | ------------------------- |
+| 생태계              | Redux Toolkit         | 독립적                       |
+| Redux 필요성        | Redux Store 사용        | Redux 불필요                 |
+| Cache 저장         | Redux 기반              | 자체 Query Cache            |
+| API 정의           | endpoint 중심           | query hook/options 중심     |
+| DevTools         | Redux DevTools와 통합 가능 | 전용 DevTools               |
+| Tag Invalidation | 지원                    | Query Key invalidation 방식 |
+| Generated Hooks  | 지원                    | 일반적으로 직접 hooks/options 구성 |
+| Redux 앱과 통합      | 매우 자연스러움              | 별도 서버 상태 계층               |
+
+따라서:
+
+```text
+이미 Redux Toolkit 중심 애플리케이션
+          │
+          ▼
+RTK Query가 자연스러운 선택
+```
+
+이 될 수 있습니다.
+
+반대로:
+
+```text
+Redux를 사용하지 않는 애플리케이션
+          │
+          ▼
+TanStack Query가 자연스러운 선택
+```
+
+인 경우가 많습니다.
+
+다만 어느 한쪽이 항상 우월하다는 의미는 아닙니다.
+
+애플리케이션 아키텍처와 팀의 상태 관리 전략에 따라 선택하는 것이 적절합니다.
+
+---
+
+# 39. 가장 중요한 개념 관계
+
+RTK Query를 공부할 때 다음 개념을 서로 혼동하지 않는 것이 중요합니다.
+
+```text
+Query
+│
+│ 서버 데이터 조회
+▼
+Cache Entry
+│
+│ endpoint + argument로 식별
+▼
+queryCacheKey
+
+
+Subscription
+│
+│ 누가 이 cache를 사용 중인가?
+▼
+reference count
+
+
+Tag
+│
+│ 어떤 cache를 무효화할 것인가?
+▼
+Cache Invalidation
+
+
+Mutation
+│
+│ 서버 데이터 변경
+▼
+invalidatesTags
+│
+▼
+관련 Cache invalid
+│
+▼
+Active Subscription 존재
+│
+▼
+Automatic Re-fetch
+```
+
+즉 세 개는 서로 다른 개념입니다.
 
 ```text
 Cache Key
+= 캐시의 "주소"
 
 Subscription
-
-Request Deduplication
-
-Cache Lifetime
+= 캐시를 사용하는 "사용자 수"
 
 Tag
-
-Invalidation
-
-Refetch
+= 캐시 무효화를 위한 "라벨"
 ```
 
-## 3단계 — 내부 구조
+이 세 가지를 구분하면 RTK Query의 구조가 훨씬 명확해집니다.
+
+---
+
+# 40. RTK Query 한 문장 정의
+
+RTK Query는 단순한 HTTP 요청 라이브러리가 아닙니다.
+
+> **RTK Query는 API endpoint를 선언하면 서버 요청부터 Redux Store 기반의 캐싱, 요청 상태, subscription, cache lifetime, invalidation, refetch까지 서버 상태의 전체 생명주기를 관리해 주는 Redux Toolkit의 데이터 패칭 및 캐싱 시스템입니다.**
+
+그리고 가장 핵심적인 흐름은 다음 하나로 정리할 수 있습니다.
 
 ```text
-apiSlice.reducer
-
-apiSlice.middleware
-
-setupListeners
-
-Query 전체 실행 흐름
-
-Mutation 전체 실행 흐름
+React Component
+      │
+      ▼
+Generated Hook
+      │
+      ▼
+RTK Query Endpoint
+      │
+      ▼
+queryCacheKey
+      │
+      ▼
+Redux Cache
+      │
+      ├── Cache HIT ─────────────┐
+      │                          │
+      └── Cache MISS             │
+              │                  │
+              ▼                  │
+           Request               │
+              │                  │
+              ▼                  │
+            Server               │
+              │                  │
+              ▼                  │
+           Response              │
+              │                  │
+              ▼                  │
+          Redux Cache ◀──────────┘
+              │
+              ▼
+        React Component
 ```
 
-## 4단계 — 실전에서 필요할 때
+여기에 Mutation이 발생하면:
 
 ```text
-skip
-
-Lazy Query
-
-transformResponse
-
-injectEndpoints
-
-Custom baseQuery
-
-prepareHeaders
-
-onQueryStarted
-
-queryFulfilled
-
-endpoint.initiate
-
-apiSlice.util
+Mutation
+   │
+   ▼
+Server 변경
+   │
+   ▼
+invalidatesTags
+   │
+   ▼
+관련 Query Cache invalid
+   │
+   ▼
+Active Subscription
+   │
+   ▼
+Automatic Re-fetch
 ```
 
-따라서 처음 학습할 때 가장 중요한 흐름은 이것입니다.
+가 추가됩니다.
 
-```text
-왜 RTK Query가 필요한가?
-          ↓
-       Query
-          ↓
-        Cache
-          ↓
-     Component
-          ↓
-      Mutation
-          ↓
-Server State 변경
-          ↓
-   Cache가 오래됨
-          ↓
-    Invalidation
-          ↓
-       Refetch
-          ↓
-     Cache Update
-```
-
-이 흐름이 머릿속에 잡히면 RTK Query의 나머지 기능들은 더 이상 서로 떨어져 있는 API들의 모음이 아니라, **Server State를 관리하기 위한 하나의 시스템**으로 보이기 시작합니다.
+이 구조가 RTK Query의 본질입니다.
