@@ -2,11 +2,12 @@
 
 이 문서는 **frontend**(React 19 + Vite + RTK Query)와 **noticeBoard**(Spring Boot 3 / Spring Security 6) 두 프로젝트에서 실제로 **사용되거나 언급된 모든 HTTP header**를 다룬다.
 
-각 header마다 다음 세 가지를 분리해서 적는다.
+각 header는 먼저 **한 줄 정의 사전**에서 전체 역할을 파악한 뒤, 상세 절에서 다음 네 가지를 분리해 읽도록 구성한다.
 
 | 구분 | 뜻 |
 | --- | --- |
 | **스펙** | RFC 9110 / Fetch Standard가 정의한 원래 의미 |
+| **방향·주체** | 요청/응답 중 어디에 실리며 브라우저·클라이언트·서버 중 누가 만드는가 |
 | **이 프로젝트** | 어느 파일 어느 줄에서 어떻게 쓰이는가 (근거 있는 사실만) |
 | **주의** | 시니어 관점에서 이 코드가 갖는 실제 문제 |
 
@@ -85,7 +86,97 @@ Set-Cookie: refreshToken=eyJ...; Path=/; Max-Age=1209600000; Secure; HttpOnly; S
 
 1. **header 이름은 대소문자를 구분하지 않는다.** `Content-Type`과 `content-type`은 같다. HTTP/2·HTTP/3에서는 소문자로 전송된다.
 2. **같은 이름의 header가 여러 번 나올 수 있다.** `Set-Cookie`가 대표적이며, 쿠키 하나당 한 줄이어야 한다. (`CookieSupport.setCookieFromJwt`가 `addHeader`를 세 번 호출하는 이유.)
-3. **브라우저 JS가 직접 설정할 수 없는 header가 있다.** `Origin`, `Host`, `Cookie`, `Referer`, `Content-Length`, `Connection`, `Sec-*` 등은 [forbidden request header](https://fetch.spec.whatwg.org/#forbidden-request-header)라서 브라우저가 강제로 관리한다. 이것이 4.9절의 `Access-Control-Allow-Headers` 문제와 직결된다.
+3. **브라우저 JS가 직접 설정할 수 없는 header가 있다.** `Origin`, `Host`, `Cookie`, `Referer`, `Content-Length`, `Connection`, `Sec-*` 등은 [forbidden request header](https://fetch.spec.whatwg.org/#forbidden-request-header)라서 브라우저가 강제로 관리한다. 이것이 4.6절의 `Access-Control-Allow-Headers` 문제와 직결된다.
+
+### 1.1 이 문서에 등장하는 HTTP Header 정의 사전
+
+아래 표는 사용 내역을 보기 전에 반드시 알아야 할 **각 header의 정의**다.  
+`요청`은 클라이언트가 서버에 보내는 header, `응답`은 서버가 클라이언트에 보내는 header다. `둘 다`는 요청과 응답에서 모두 사용할 수 있다는 뜻이다.
+
+#### 표현과 콘텐츠
+
+| Header | 방향 | 정의 | 대표 예 |
+| --- | --- | --- | --- |
+| `Content-Type` | 둘 다 | 메시지 body 또는 multipart 각 파트의 **데이터 형식(Media Type)**과 처리 방식을 알린다. | `application/json`, `multipart/form-data; boundary=...` |
+| `Content-Length` | 둘 다 | 메시지 body의 크기를 **바이트(옥텟)** 단위로 나타낸다. | `Content-Length: 348` |
+| `Content-Disposition` | 주로 응답·multipart 파트 | 콘텐츠를 브라우저에 바로 표시할지 다운로드할지, 또는 multipart 파트의 필드명·파일명을 설명한다. | `attachment; filename="report.pdf"` |
+| `Accept` | 요청 | 클라이언트가 응답으로 받을 수 있거나 선호하는 미디어 타입을 서버에 알린다. | `Accept: application/json` |
+
+`Content-Type`은 **지금 보내는 body의 형식**, `Accept`는 **돌려받고 싶은 응답의 형식**이다. 둘은 반대 방향의 요구를 표현한다.
+
+#### CORS
+
+| Header | 방향 | 정의 | 누가 사용하는가 |
+| --- | --- | --- | --- |
+| `Origin` | 요청 | 현재 요청을 시작한 문서의 origin(`scheme + host + port`)을 나타낸다. 경로는 포함하지 않는다. | 브라우저가 생성하고 서버가 허용 여부를 판단한다. |
+| `Access-Control-Allow-Origin` | 응답 | 해당 응답을 JavaScript가 읽도록 허용할 origin을 지정한다. | 서버가 보내고 브라우저가 검사한다. |
+| `Access-Control-Allow-Credentials` | 응답 | credentials mode가 `include`인 CORS 응답을 브라우저가 JavaScript에 공개해도 되는지 나타낸다. 유효한 값은 `true`다. | 서버가 보내고 브라우저가 검사한다. |
+| `Access-Control-Allow-Methods` | preflight 응답 | 이어질 실제 CORS 요청에서 허용할 HTTP 메서드를 나열한다. | 서버가 보내고 브라우저가 검사한다. |
+| `Access-Control-Allow-Headers` | preflight 응답 | 이어질 실제 CORS 요청에서 허용할 non-safelisted 요청 header 이름을 나열한다. | 서버가 보내고 브라우저가 검사한다. |
+| `Access-Control-Max-Age` | preflight 응답 | preflight 허용 결과를 브라우저가 캐시할 수 있는 시간을 초 단위로 알린다. | 서버가 보내고 브라우저가 캐시한다. |
+| `Access-Control-Request-Method` | preflight 요청 | 실제 요청에서 사용할 HTTP 메서드를 미리 알린다. | 브라우저가 자동 생성한다. |
+| `Access-Control-Request-Headers` | preflight 요청 | 실제 요청에서 사용할 non-safelisted header 이름들을 미리 알린다. | 브라우저가 자동 생성한다. |
+| `Vary` | 응답 | 나열된 요청 header의 값에 따라 응답 표현이 달라진다는 사실을 캐시에 알린다. | `Vary: Origin`은 origin별 CORS 응답의 캐시 혼용을 막는다. |
+
+중요한 구분: CORS 응답 header는 서버 요청 자체를 차단하는 방화벽이 아니다. 브라우저가 **응답을 프론트 JavaScript에 공개할지** 판정하는 규칙이다.
+
+#### 인증과 상태
+
+| Header | 방향 | 정의 | 대표 예 |
+| --- | --- | --- | --- |
+| `Cookie` | 요청 | 브라우저가 현재 URL의 쿠키 규칙에 맞는 `name=value` 쌍을 서버로 보낸다. | `Cookie: accessToken=...; refreshToken=...` |
+| `Set-Cookie` | 응답 | 서버가 브라우저에 쿠키의 생성·변경·삭제를 지시한다. | `Set-Cookie: accessToken=...; HttpOnly; Secure` |
+| `Authorization` | 요청 | 선택한 인증 scheme과 credentials를 서버에 전달한다. | `Authorization: Bearer <token>` |
+| `WWW-Authenticate` | 응답 | 서버가 클라이언트에 사용할 인증 scheme과 인증 범위를 알린다. 보통 `401`과 함께 사용한다. | `WWW-Authenticate: Bearer realm="api"` |
+
+`Set-Cookie`는 **저장 지시**, `Cookie`는 저장된 쿠키의 **후속 전송**이다. `HttpOnly`, `Secure`, `SameSite`, `Path` 같은 속성은 `Set-Cookie`에만 있고 이후 `Cookie` 요청에는 포함되지 않는다.
+
+#### 라우팅과 리다이렉트
+
+| Header | 방향 | 정의 | 대표 예 |
+| --- | --- | --- | --- |
+| `Host` | 요청 | 클라이언트가 접속하려는 호스트와 포트를 나타낸다. HTTP/2·HTTP/3에서는 주로 `:authority`가 같은 역할을 한다. | `Host: api.example.com` |
+| `Location` | 응답 | 리다이렉트할 URL 또는 새로 생성된 리소스의 URL을 알려준다. | `Location: /posts/42` |
+| `Referer` | 요청 | 현재 요청을 유발한 이전 페이지의 주소를 전달한다. 노출 범위는 `Referrer-Policy`가 제어한다. | `Referer: https://app.example.com/posts` |
+| `X-Forwarded-For` | 요청(프록시가 추가) | 프록시를 거치기 전 원래 클라이언트 IP의 전달 이력을 나타낸다. | `X-Forwarded-For: 203.0.113.7` |
+| `X-Forwarded-Proto` | 요청(프록시가 추가) | 클라이언트가 프록시에 접속할 때 사용한 원래 scheme을 알린다. | `X-Forwarded-Proto: https` |
+| `X-Forwarded-Host` | 요청(프록시가 추가) | 클라이언트가 요청한 원래 `Host` 값을 알린다. | `X-Forwarded-Host: app.example.com` |
+
+`X-Forwarded-*`는 인터넷 클라이언트가 보낸 값을 그대로 신뢰하면 안 된다. **신뢰할 수 있는 리버스 프록시가 기존 값을 제거하거나 검증한 뒤 추가한다는 전제**에서만 사용한다.
+
+#### WebSocket opening handshake
+
+| Header | 방향 | 정의 |
+| --- | --- | --- |
+| `Upgrade` | 요청·응답 | 현재 HTTP 연결에서 다른 프로토콜로 전환할 것을 요청하거나 수락한다. WebSocket에서는 값이 `websocket`이다. |
+| `Connection` | 요청·응답 | 현재 연결에만 적용할 connection option을 지정한다. WebSocket HTTP/1.1 handshake에서는 `Upgrade`를 지목한다. |
+| `Sec-WebSocket-Key` | handshake 요청 | 클라이언트가 생성한 nonce를 base64로 보내 서버 응답 검증의 입력으로 사용한다. 인증 토큰은 아니다. |
+| `Sec-WebSocket-Accept` | handshake 응답 | 서버가 `Sec-WebSocket-Key`를 규칙대로 처리했음을 증명해 WebSocket 전환을 수락한다. |
+| `Sec-WebSocket-Version` | handshake 요청 | 클라이언트가 사용할 WebSocket 프로토콜 버전을 알린다. 현재 표준 버전은 `13`이다. |
+| `Sec-WebSocket-Extensions` | handshake 요청·응답 | `permessage-deflate` 같은 WebSocket 확장 기능을 제안하고 협상한다. |
+| `Sec-WebSocket-Protocol` | handshake 요청·응답 | 애플리케이션 subprotocol을 제안하고 선택한다. |
+
+이 `Sec-WebSocket-*` header는 **WebSocket 연결을 시작하는 HTTP handshake에만** 속한다. 연결 후 STOMP frame 안에 나타나는 `destination`, `content-type`, `Authorization` 등은 HTTP header가 아니다.
+
+#### 캐시·조건부 요청·진단·보안
+
+| Header | 방향 | 정의 |
+| --- | --- | --- |
+| `User-Agent` | 요청 | 요청을 만든 클라이언트 소프트웨어의 식별 정보를 전달한다. 사용자가 바꿀 수 있으므로 신원 증명 수단은 아니다. |
+| `X-Requested-With` | 요청 | 과거 Ajax 요청임을 표시하던 비표준 관습 header다. 보통 값은 `XMLHttpRequest`다. |
+| `Cache-Control` | 둘 다 | 캐시 저장·재검증·유효 기간에 관한 지시자를 전달한다. |
+| `ETag` | 응답 | 특정 표현 버전을 식별하는 opaque validator다. 반드시 파일의 MD5를 뜻하지는 않는다. |
+| `If-None-Match` | 요청 | 보유한 `ETag`를 보내 현재 표현과 같으면 body 대신 `304`를 받도록 조건을 건다. |
+| `Last-Modified` | 응답 | 서버가 알고 있는 리소스의 마지막 수정 시각을 알린다. |
+| `If-Modified-Since` | 요청 | 지정 시각 이후 변경된 경우에만 표현을 보내 달라는 조건을 건다. |
+| `Strict-Transport-Security` | 응답 | 일정 기간 해당 호스트에는 HTTPS로만 접속하도록 브라우저에 지시한다. |
+| `X-Content-Type-Options` | 응답 | `nosniff` 값으로 선언된 MIME 타입을 브라우저가 임의로 추측하지 못하게 한다. |
+| `X-Frame-Options` | 응답 | 다른 문서의 frame 안에 현재 문서를 표시할 수 있는 범위를 제한한다. |
+| `Content-Security-Policy` | 응답 | 스크립트·스타일·이미지·frame 등 리소스 로드와 실행이 허용되는 출처를 정책으로 제한한다. |
+| `Referrer-Policy` | 응답 | 이후 요청의 `Referer`에 어느 수준의 정보를 포함할지 정한다. |
+| `Cross-Origin-Opener-Policy` | 응답 | top-level 문서의 browsing context group 분리를 제어해 다른 origin 창과의 참조 관계를 제한한다. |
+
+이제부터의 인벤토리와 상세 절은 위 정의를 프로젝트 코드에 대입해 **어디에서 생성되고, 어디에서 읽히며, 현재 구현에 어떤 문제가 있는지** 설명한다.
 
 ---
 
@@ -248,7 +339,7 @@ downloadAttachment: builder.mutation({
 })
 ```
 
-**이 구현은 의도적으로 옳다.** `<a download>` 속성은 **cross-origin URL에서는 브라우저가 무시한다.** S3 URL을 그대로 `href`에 넣었다면 다운로드 대신 브라우저 탭에서 열려버리고 파일명도 UUID가 됐을 것이다. 먼저 `fetch` → `blob` → `blob:` object URL로 바꾸면 same-origin이 되어 `download` 속성이 살아난다. `frontend/CLAUDE.md:119`가 이 엔드포인트만 `queryFn`으로 baseQuery를 우회하는 이유도 같은 맥락이다 — `/api` 접두사와 `credentials: 'include'`가 외부 오리진에 붙으면 안 되기 때문.
+**이 구현은 의도적으로 옳다.** `<a download>` 속성은 **cross-origin URL에서는 브라우저가 무시한다.** S3 URL을 그대로 `href`에 넣었다면 다운로드 대신 브라우저 탭에서 열려버리고 파일명도 UUID가 됐을 것이다. 먼저 `fetch` → `blob` → `blob:` object URL로 바꾸면 same-origin이 되어 `download` 속성이 살아난다. `frontend/CLAUDE.md:119`가 이 엔드포인트만 `queryFn`으로 baseQuery를 우회하는 이유도 같은 맥락이다 — `/api` 접두사와 `credentials: 'include'`가 외부 origin에 붙으면 안 되기 때문.
 
 **주의.** 이 방식은 **S3 버킷에 CORS 설정이 있어야만 동작한다.** `fetch(url)` + `.blob()`은 응답 body를 읽는 것이므로 S3가 `Access-Control-Allow-Origin`을 내려주지 않으면 CORS 에러로 실패한다. 필요한 버킷 CORS 규칙:
 
@@ -277,9 +368,9 @@ headers.setBearerAuth(accessToken.getTokenValue());
 headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
 ```
 
-Spring 서버가 **클라이언트가 되어** naver/google/kakao의 UserInfo 엔드포인트를 호출할 때 붙인다. 프론트 → 백엔드 방향에서는 `fetch`가 기본값 `*/*`를 보내고, 백엔드는 `@RestController`라 항상 JSON으로만 응답하므로 negotiation이 일어나지 않는다.
+Spring 서버가 **클라이언트가 되어** naver/google/kakao의 UserInfo 엔드포인트를 호출할 때 붙인다. 프론트 → 백엔드 방향에서는 `fetch`가 디폴트값 `*/*`를 보내고, 백엔드는 `@RestController`라 항상 JSON으로만 응답하므로 negotiation이 일어나지 않는다.
 
-`Accept`가 `CorsFilter`의 `Access-Control-Allow-Headers` 목록에 들어 있지만, 이건 CORS-safelisted header라서 나열할 필요가 없다(3.5절 참고).
+`Accept`가 `CorsFilter`의 `Access-Control-Allow-Headers` 목록에 들어 있지만, 이건 CORS-safelisted header라서 나열할 필요가 없다(4.6절 참고).
 
 > HTML의 `<input accept="image/png,image/jpeg">`(`RegisterPage.jsx:244`, `MeetingEditorPage.jsx:160`, `ProfilePage.jsx:152`)는 **HTTP `Accept` header가 아니다.** 파일 선택 다이얼로그의 필터일 뿐이고, 사용자가 "모든 파일"로 바꾸면 우회된다. 실제 검증은 `lib/file.js`의 `validateImage`가 한다.
 
@@ -287,7 +378,7 @@ Spring 서버가 **클라이언트가 되어** naver/google/kakao의 UserInfo �
 
 ## 4. CORS Header
 
-CORS(Cross-Origin Resource Sharing)는 브라우저가 다른 오리진의 응답을 JS에 넘겨줄지 결정하는 규칙이다. **오리진 = scheme + host + port** 삼중항이며, 하나라도 다르면 cross-origin이다.
+CORS(Cross-Origin Resource Sharing)는 브라우저가 다른 origin의 응답을 JS에 넘겨줄지 결정하는 규칙이다. **origin = scheme + host + port** 삼중항이며, 하나라도 다르면 cross-origin이다.
 
 이 프로젝트의 CORS는 전부 한 파일에 있다.
 
@@ -321,7 +412,7 @@ public class CorsFilter implements Filter {
 
 ### 4.1 `Origin`
 
-**스펙.** 요청을 보낸 문서의 오리진. **scheme + host + port만** 담고 경로는 담지 않는다. 브라우저가 강제로 붙이며 JS가 위조할 수 없다(forbidden header).
+**스펙.** 요청을 보낸 문서의 origin. **scheme + host + port만** 담고 경로는 담지 않는다. 브라우저가 강제로 붙이며 JS가 위조할 수 없다(forbidden header).
 
 붙는 경우:
 
@@ -330,27 +421,27 @@ public class CorsFilter implements Filter {
 - `<form>` 제출, WebSocket handshake
 - GET / HEAD same-origin에는 붙지 않음
 
-`Origin: null`이 되는 경우도 있다 — `file://`, sandboxed iframe, 일부 리다이렉트. 문자열 `"null"`을 유효한 오리진으로 화이트리스트에 넣으면 안 된다.
+`Origin: null`이 되는 경우도 있다 — `file://`, sandboxed iframe, 일부 리다이렉트. 문자열 `"null"`을 유효한 origin으로 화이트리스트에 넣으면 안 된다.
 
-**이 프로젝트.** `CorsFilter.java:30`에서 이름만 언급된다. 서버 코드는 `request.getHeader("Origin")`을 **읽지 않는다.** 허용 오리진이 `client.url` 설정값 하나로 고정되어 있기 때문이다.
+**이 프로젝트.** `CorsFilter.java:30`에서 이름만 언급된다. 서버 코드는 `request.getHeader("Origin")`을 **읽지 않는다.** 허용 origin이 `client.url` 설정값 하나로 고정되어 있기 때문이다.
 
 `index.html`의 `<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />`에서 `crossorigin` 속성이 `Origin` header를 붙게 만든다. 폰트 파일은 CORS 모드로 받아야 하므로 이 속성이 필요하다.
 
-**주의.** 허용 오리진이 하나로 고정된 것은 **보안상 오히려 좋다.** 흔한 취약점인 "`Origin`을 그대로 에코백"(`response.setHeader("ACAO", request.getHeader("Origin"))`)을 피했다. 다만 스테이징·프리뷰 도메인이 늘어나면 화이트리스트 검증 로직이 필요해지고, 그 순간 `Vary: Origin`이 필수가 된다(4.10절).
+**주의.** 허용 origin이 하나로 고정된 것은 **보안상 오히려 좋다.** 흔한 취약점인 "`Origin`을 그대로 에코백"(`response.setHeader("ACAO", request.getHeader("Origin"))`)을 피했다. 다만 스테이징·프리뷰 도메인이 늘어나면 화이트리스트 검증 로직이 필요해지고, 그 순간 `Vary: Origin`이 필수가 된다(4.9절).
 
 ### 4.2 `Access-Control-Allow-Origin` (ACAO)
 
-**스펙.** 응답 header. 이 응답을 읽어도 되는 오리진을 지정한다. 값은 정확히 하나의 오리진이거나 `*`다. **콤마로 여러 개를 나열할 수 없다.**
+**스펙.** 응답 header. 이 응답을 읽어도 되는 origin을 지정한다. 값은 정확히 하나의 origin이거나 `*`다. **콤마로 여러 개를 나열할 수 없다.**
 
 **이 프로젝트.** `http://localhost:5173` 고정 (`CorsFilter.java:26` ← `application.yaml`의 `client.url`).
 
 이 값은 `frontend/vite.config.js`의 `server.port: 5173` + `strictPort: true`와 짝을 이룬다. vite.config.js 주석이 명시하듯 "백엔드 application.yaml의 client.url과 반드시 같아야 한다". `strictPort: true`가 있어서, 5173이 점유되면 Vite가 5174로 조용히 넘어가는 대신 **실패한다.** OAuth 리다이렉트가 소리 없이 깨지는 사고를 막는 좋은 설정이다.
 
-**주의.** `Access-Control-Allow-Credentials: true`와 함께 쓸 때 ACAO가 `*`면 브라우저가 응답을 **무조건 거부한다.** 현재는 구체적 오리진이라 이 함정은 피했다.
+**주의.** `Access-Control-Allow-Credentials: true`와 함께 쓸 때 ACAO가 `*`면 브라우저가 응답을 **무조건 거부한다.** 현재는 구체적 origin이라 이 함정은 피했다.
 
 ### 4.3 `Access-Control-Allow-Credentials`
 
-**스펙.** 값은 문자열 `true`만 유효하다(`false`를 보내는 것과 header를 안 보내는 것이 같다). 이 header가 있어야 브라우저가 cross-origin 요청에 쿠키를 실어 보내고, 그 응답을 JS에 넘긴다.
+**스펙.** 값은 대소문자를 구분하는 문자열 `true`만 유효하다(`false`를 보내는 것과 header를 안 보내는 것이 같다). 요청에 쿠키를 실을지는 클라이언트의 credentials mode와 브라우저 쿠키 정책이 결정한다. 이 header는 credentials mode가 `include`인 CORS 응답을 브라우저가 JS에 공개하도록 허용하는 응답 측 조건이다.
 
 **이 프로젝트.** `true` (`CorsFilter.java:27`). 프론트 쪽 짝은 이것이다.
 
@@ -362,7 +453,7 @@ const rawBaseQuery = fetchBaseQuery({
 })
 ```
 
-**양쪽이 다 있어야 한다.** 클라이언트의 `credentials: 'include'`만 있고 서버에 이 header가 없으면 브라우저가 응답을 버린다. 반대도 마찬가지다.
+**응답을 JavaScript에서 사용하려면 양쪽 설정이 맞아야 한다.** 클라이언트의 `credentials: 'include'`로 쿠키가 전송되더라도 서버에 이 header가 없으면 브라우저는 CORS 응답을 프론트 코드에 공개하지 않는다. 반대로 서버가 이 header를 보내도 클라이언트가 credentials를 포함하도록 요청하지 않았다면 그것만으로 쿠키가 전송되지는 않는다.
 
 **주의 (중요).** `Access-Control-Allow-Credentials: true`는 **CSRF 노출과 직결된다.**
 
@@ -397,7 +488,7 @@ response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELET
 
 ### 4.5 `Access-Control-Max-Age`
 
-**스펙.** preflight 결과를 캐시할 초 수. 같은 (오리진, URL, 메서드, header 집합) 조합에 대해 이 시간 동안 OPTIONS를 생략한다.
+**스펙.** preflight 결과를 캐시할 초 수. 같은 (origin, URL, 메서드, header 집합) 조합에 대해 이 시간 동안 OPTIONS를 생략한다.
 
 **이 프로젝트.** `3600` (1시간, `CorsFilter.java:29`).
 
@@ -470,7 +561,7 @@ Access-Control-Request-Headers: content-type
 
 ### 4.9 `Vary` — 없는 header ⚠️
 
-**스펙.** 응답 header. "이 응답은 나열된 요청 header 값에 따라 달라진다"고 캐시에 알린다. `Origin`에 따라 ACAO를 다르게 주는 서버는 `Vary: Origin`이 필수다. 없으면 공유 캐시가 A 오리진용 응답을 B 오리진에 재사용해 CORS가 무작위로 깨진다.
+**스펙.** 응답 header. "이 응답은 나열된 요청 header 값에 따라 달라진다"고 캐시에 알린다. `Origin`에 따라 ACAO를 다르게 주는 서버는 `Vary: Origin`이 필수다. 없으면 공유 캐시가 A origin용 응답을 B origin에 재사용해 CORS가 무작위로 깨진다.
 
 **이 프로젝트.** 없다.
 
@@ -535,7 +626,7 @@ if (result.data?.data === '4') {          // ResponseCode.CREATE_ACCESS_TOKEN
 @CookieValue String accessToken
 ```
 
-`@CookieValue`는 기본이 `required = true`다. 쿠키가 없으면 Spring이 `MissingRequestCookieException` → **400 Bad Request**를 낸다. 인증 실패의 올바른 코드는 401인데 400이 나가므로, 프론트의 `STATUS_MESSAGE[400]`("요청 값을 확인해주세요.")이 뜬다. 실제로는 "로그인이 필요합니다"여야 한다.
+`@CookieValue`는 디폴트가 `required = true`다. 쿠키가 없으면 Spring이 `MissingRequestCookieException` → **400 Bad Request**를 낸다. 인증 실패의 올바른 코드는 401인데 400이 나가므로, 프론트의 `STATUS_MESSAGE[400]`("요청 값을 확인해주세요.")이 뜬다. 실제로는 "로그인이 필요합니다"여야 한다.
 
 또한 이건 **컨트롤러가 인증 컨텍스트를 직접 다룬다**는 뜻이다. `SecurityContextHolder`에 이미 `Authentication`이 채워져 있으므로 `@AuthenticationPrincipal`로 받는 게 정석이다. 28곳에 `@CookieValue String accessToken`이 반복되는 것은 인증 방식을 바꿀 때 28곳을 고쳐야 한다는 뜻이기도 하다.
 
@@ -575,7 +666,7 @@ Set-Cookie: <name>=<value>; Domain=<d>; Path=<p>; Max-Age=<s>; Expires=<date>; S
 | `Secure` | HTTPS에서만 전송. **단 `http://localhost`는 trustworthy origin으로 취급되어 예외.** |
 | `HttpOnly` | `document.cookie`로 읽을 수 없음. XSS로 토큰 탈취 방어. |
 | `SameSite=Strict` | cross-site 요청에 절대 안 붙음. |
-| `SameSite=Lax` | 기본값. top-level GET 네비게이션에만 붙음. |
+| `SameSite=Lax` | 디폴트값. top-level GET 네비게이션에만 붙음. |
 | `SameSite=None` | 항상 붙음. **`Secure` 필수.** |
 
 **이 프로젝트.**
@@ -659,7 +750,7 @@ response.addCookie(accessToken);
 
 쿠키 삭제는 **`Name` + `Domain` + `Path`가 정확히 일치**해야 성립한다. 생성 시에는 `SameSite=None; Secure`가 붙었는데 삭제 시에는 `jakarta.servlet.http.Cookie`를 써서 `SameSite`도 `Secure`도 붙지 않는다.
 
-`Name`/`Domain`/`Path`는 일치하므로 **삭제 자체는 동작한다** (`SameSite`와 `Secure`는 매칭 키가 아니다). 다만 삭제 지시를 담은 이 응답이 cross-site 문맥에서 오면, `SameSite` 기본값(Lax)에 걸려 브라우저가 이 `Set-Cookie`를 무시할 수 있다. 생성과 삭제는 **같은 빌더로 같은 속성 집합**을 쓰는 것이 안전하다.
+`Name`/`Domain`/`Path`는 일치하므로 **삭제 자체는 동작한다** (`SameSite`와 `Secure`는 매칭 키가 아니다). 다만 삭제 지시를 담은 이 응답이 cross-site 문맥에서 오면, `SameSite` 디폴트값(Lax)에 걸려 브라우저가 이 `Set-Cookie`를 무시할 수 있다. 생성과 삭제는 **같은 빌더로 같은 속성 집합**을 쓰는 것이 안전하다.
 
 ```java
 // 권장
@@ -828,7 +919,7 @@ Set-Cookie: JSESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax
 
 **주의 2.** `CustomAuthenticationFailureHandler`는 `setErrorResponse(response, 401, ...)`로 **응답 본문을 먼저 쓰고**(`:28`) 그 다음 `sendRedirect`를 호출한다(`:31`). 두 동작은 양립하지 않는다.
 
-- 응답이 아직 커밋되지 않았다면(Tomcat 기본 버퍼 8KB — 짧은 JSON이면 보통 여기) `sendRedirect`가 버퍼를 리셋하고 302 + `Location`을 낸다. **`setErrorResponse`가 쓴 401 JSON은 통째로 버려진다.**
+- 응답이 아직 커밋되지 않았다면(Tomcat 디폴트 버퍼 8KB — 짧은 JSON이면 보통 여기) `sendRedirect`가 버퍼를 리셋하고 302 + `Location`을 낸다. **`setErrorResponse`가 쓴 401 JSON은 통째로 버려진다.**
 - 버퍼를 넘겨 이미 커밋됐다면 `sendRedirect`가 `IllegalStateException`을 던진다.
 
 즉 어느 쪽이든 의도한 대로 동작하지 않는다. API 클라이언트용 401 JSON을 줄지, 브라우저용 302를 줄지 하나만 정해야 한다. 이 흐름은 브라우저 전체 페이지 이동에서 오므로 **302 쪽이 맞다** — `setErrorResponse` 호출을 지우면 된다.
@@ -839,7 +930,7 @@ Set-Cookie: JSESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax
 
 **이 프로젝트.** 코드에서 읽지 않는다. OAuth 리다이렉트 체인에서 브라우저가 자동으로 붙인다.
 
-**주의.** `CustomAuthenticationFailureHandler`가 에러 메시지를 **쿼리 스트링**에 담는다(`/oauth/error?message=...`). 그 페이지에서 나가는 모든 요청의 `Referer`에 이 메시지가 실린다. 지금은 민감하지 않지만, 에러 메시지에 이메일이나 내부 식별자가 들어가면 유출 경로가 된다. `Referrer-Policy: strict-origin-when-cross-origin`을 기본으로 두는 게 좋다.
+**주의.** `CustomAuthenticationFailureHandler`가 에러 메시지를 **쿼리 스트링**에 담는다(`/oauth/error?message=...`). 그 페이지에서 나가는 모든 요청의 `Referer`에 이 메시지가 실린다. 지금은 민감하지 않지만, 에러 메시지에 이메일이나 내부 식별자가 들어가면 유출 경로가 된다. `Referrer-Policy: strict-origin-when-cross-origin`을 디폴트로 두는 게 좋다.
 
 ---
 
@@ -909,7 +1000,7 @@ webSocketFactory: () => new SockJS('/ws'),
 
 `vite.config.js`의 `'/ws': { target: BACKEND, changeOrigin: true, ws: true }`에서 `ws: true`가 `Upgrade`/`Connection` header를 프록시가 전달하도록 한다. 이게 없으면 handshake가 101 대신 200으로 떨어지고 SockJS가 조용히 XHR 폴백으로 내려간다 — "채팅이 되긴 하는데 느리다"의 전형적 원인이다.
 
-**주의.** `setAllowedOriginPatterns("*")`는 WebSocket handshake에 대해 **모든 오리진을 허용**한다. `CorsFilter`가 HTTP API에는 `http://localhost:5173`만 허용하는 것과 어긋난다. WebSocket은 same-origin 정책의 적용을 받지 않으므로(브라우저가 cross-origin WebSocket을 막지 않는다) 이건 실제 위험이다 — 공격자 페이지가 피해자의 쿠키로 채팅 소켓을 열 수 있다(Cross-Site WebSocket Hijacking). `setAllowedOrigins(clientUrl)`로 좁혀야 한다.
+**주의.** `setAllowedOriginPatterns("*")`는 WebSocket handshake에 대해 **모든 origin을 허용**한다. `CorsFilter`가 HTTP API에는 `http://localhost:5173`만 허용하는 것과 어긋난다. WebSocket은 same-origin 정책의 적용을 받지 않으므로(브라우저가 cross-origin WebSocket을 막지 않는다) 이건 실제 위험이다 — 공격자 페이지가 피해자의 쿠키로 채팅 소켓을 열 수 있다(Cross-Site WebSocket Hijacking). `setAllowedOrigins(clientUrl)`로 좁혀야 한다.
 
 ### 7.3 STOMP frame header (HTTP 아님)
 
@@ -1003,7 +1094,7 @@ if (!valueOperations.getOperations().hasKey(key)) {
 **주의 (보안).** 인증 정보를 담은 응답에는 `Cache-Control: no-store`가 필요하다. 현재 `/profiles`, `/admin/**` 같은 응답에 아무 캐시 지시자가 없어서, 중간 프록시나 브라우저 back/forward 캐시에 개인정보가 남을 수 있다.
 
 ```java
-// SecurityConfig 에 추가 — Spring Security 의 기본 캐시 방어를 켠다
+// SecurityConfig 에 추가 — Spring Security의 디폴트 캐시 방어를 켠다
 http.headers(headers -> headers
     .cacheControl(Customizer.withDefaults())   // no-cache, no-store, max-age=0, must-revalidate
 );
@@ -1011,7 +1102,7 @@ http.headers(headers -> headers
 
 ### 8.4 없는 보안 응답 header ⚠️
 
-`SecurityConfig`가 `http.headers(...)`를 전혀 설정하지 않는다. Spring Security는 기본적으로 여러 보안 header를 넣어주지만, 이 프로젝트는 `HttpSecurity`를 명시적으로 구성하면서 그 부분을 건드리지 않았다. 확인 및 추가가 필요한 목록:
+`SecurityConfig`가 `http.headers(...)`를 전혀 설정하지 않는다. Spring Security는 디폴트로 여러 보안 header를 넣어주지만, 이 프로젝트는 `HttpSecurity`를 명시적으로 구성하면서 그 부분을 건드리지 않았다. 확인 및 추가가 필요한 목록:
 
 | Header | 값 | 막는 것 |
 | --- | --- | --- |
@@ -1020,7 +1111,7 @@ http.headers(headers -> headers
 | `X-Frame-Options` / `frame-ancestors` | `DENY` | 클릭재킹 |
 | `Content-Security-Policy` | 최소 `default-src 'self'` | XSS. `RichTextEditor.jsx`가 있으므로 실제 위협. |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | URL 유출 (6.3절) |
-| `Cross-Origin-Opener-Policy` | `same-origin` | 크로스 오리진 윈도우 참조 |
+| `Cross-Origin-Opener-Policy` | `same-origin` | cross-origin 윈도우 참조 |
 
 ---
 
@@ -1404,7 +1495,7 @@ server {
 }
 ```
 
-이 구성이면 브라우저 입장에서 모든 것이 `https://app.example.com` 하나의 오리진이다.
+이 구성이면 브라우저 입장에서 모든 것이 `https://app.example.com` 하나의 origin이다.
 
 - `CorsFilter`의 `Access-Control-*`가 전부 무의미해진다 → 필터를 지워도 된다
 - 쿠키를 `SameSite=Lax`로 좁힐 수 있다 → CSRF 표면이 사라진다
